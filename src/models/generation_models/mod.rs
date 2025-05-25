@@ -16,6 +16,7 @@ pub struct Product {
 pub struct Payload {
     pub prompt: String,
     pub images: Vec<ImageData>, 
+    pub system_prompt: Option<String>
 }
 
 #[derive(Deserialize)]

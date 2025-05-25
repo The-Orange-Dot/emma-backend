@@ -6,6 +6,9 @@ use sqlx::Row;
 mod update_embed_data;
 use update_embed_data::update_embed_data;
 
+mod preload_model;
+use preload_model::preload_model;
+
 // mod create_extensions;
 // use create_extensions::create_extensions;
 
@@ -43,6 +46,8 @@ pub async fn init_pgai (pool: sqlx::Pool<sqlx::Postgres>) -> Result<HttpResponse
       actix_web::error::ErrorInternalServerError("Database error")
   })?;
 
+  let _preloads_model = preload_model(pool.clone())
+        .await?;
 
   match test {
       Some(row) => {

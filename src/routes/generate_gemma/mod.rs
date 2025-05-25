@@ -20,26 +20,27 @@ pub async fn generate_gemma (payload: web::Json<Payload>,pool: web::Data<Pool<Po
   // println!("[USER PROMPT]: {}", req.prompt);
 
   let response_with_products = add_products_suggestion(
-    req.prompt, 
-    req.images,
-    pool.clone(), 
-    target_table
+        req,
+        pool.clone(), 
+        target_table
   )
-    .await.expect("Error generating response with product embedding");
+    .await
+    .expect("Error generating response with product embedding");
 
   // println!("RESPONSE: {}", response_with_products);
 
   let parsed_response = parse_response(
     response_with_products, 
     pool.clone())
-  .await.expect("Error parsing first response to extract text and products.");
+        .await
+        .expect("Error parsing first response to extract text and products.");
 
   // println!("PARSED MESSAGE: {}", parsed_response.text);
 
   Ok(HttpResponse::Ok().json(serde_json::json!({
-    "status": "success",
-    "message": "Successfully received message from Server",
-    "response": parsed_response.text,
-    "products": parsed_response.products
+      "status": "success",
+      "message": "Successfully received message from Server",
+      "response": parsed_response.text,
+      "products": parsed_response.products
   })))
 }

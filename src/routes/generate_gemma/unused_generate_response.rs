@@ -1,6 +1,8 @@
 use crate::models::generation_models::{GemmaRequest, ImageData};
 use actix_web::{Result, Error};
 
+// DONT EVENT USE THIS ANYMORE
+
 fn extract_base64(data_url: &str) -> Result<String, String> {
     data_url
         .split(',')

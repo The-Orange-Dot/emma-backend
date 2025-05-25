@@ -1,10 +1,9 @@
 use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
-use crate::models::generation_models::ImageData;
+use crate::models::generation_models::{Payload};
 
 pub async fn add_products_suggestion(
-    first_response: String,
-    images: Vec<ImageData>,
+    req: Payload,
     pool: actix_web::web::Data<Pool<Postgres>>,
     _table: &str,
 ) -> Result<String, Error> {
@@ -13,8 +12,8 @@ pub async fn add_products_suggestion(
         .expect("No model has been set for PGAI context prompt");
 
     // Prepare base64 images for PostgreSQL
-    let image_params = if !images.is_empty() {
-        let image_strings = images.iter()
+    let image_params = if !req.images.is_empty() {
+        let image_strings = req.images.iter()
             .map(|img| {
                 let clean_base64 = if img.data_url.starts_with("data:") {
                     img.data_url.split(',').nth(1).unwrap_or(&img.data_url)
@@ -30,6 +29,9 @@ pub async fn add_products_suggestion(
     } else {
         "NULL::bytea[]".to_string()
     };
+
+    let default_system_val = format!("");
+    let sys_prompt = req.system_prompt.unwrap_or(default_system_val); 
 
     let query = format!(
         r#"
@@ -51,17 +53,20 @@ pub async fn add_products_suggestion(
             'Include the products as a list at the end of the response each have to be in their own square brackets with no commas between them [Like] [This].\n\n' ||
             'User query: ' || $1 || '\n\n' ||
             'Relevant products: ' || (SELECT context_chunk FROM context_agg),
-            images => {}
+            images => {},
+            system_prompt => '{}'
         )->>'response' as response
         "#,
         model,
-        image_params
+        image_params,
+        sys_prompt
     );
+
 
     // println!("Executing query:\n{}", query); // Debug output
 
     let response = sqlx::query_scalar::<_, String>(&query)
-        .bind(first_response)
+        .bind(req.prompt)
         .fetch_one(pool.get_ref())
         .await
         .map_err(|err| {
