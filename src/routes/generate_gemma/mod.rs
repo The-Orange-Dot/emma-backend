@@ -17,7 +17,8 @@ pub async fn generate_gemma (payload: web::Json<Payload>,pool: web::Data<Pool<Po
   // Make this more dynamic in the future
   let target_table = "public.products";
 
-  // println!("[USER PROMPT]: {}", req.prompt);
+
+  println!("[USER PROMPT]: {}", req.prompt);
 
   let response_with_products = add_products_suggestion(
         req,

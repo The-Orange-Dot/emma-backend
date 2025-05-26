@@ -1,5 +1,6 @@
 use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
+use crate::models::generation_models::ImageData;
 use crate::models::generation_models::{Payload};
 
 pub async fn add_products_suggestion(
@@ -8,7 +9,7 @@ pub async fn add_products_suggestion(
     _table: &str,
 ) -> Result<String, Error> {
     dotenv::dotenv().ok();
-    let model = std::env::var("LMM_MODEL")
+    let model = std::env::var("LLM_MODEL")
         .expect("No model has been set for PGAI context prompt");
 
     // Prepare base64 images for PostgreSQL
@@ -53,15 +54,14 @@ pub async fn add_products_suggestion(
             'Include the products as a list at the end of the response each have to be in their own square brackets with no commas between them [Like] [This].\n\n' ||
             'User query: ' || $1 || '\n\n' ||
             'Relevant products: ' || (SELECT context_chunk FROM context_agg),
-            images => {},
-            system_prompt => '{}'
+            system_prompt => 'Your job is to look at the image given to you and answer any questions that are asked. You must NEVER give medical advice to the clients. {}',
+            images => {}
         )->>'response' as response
         "#,
         model,
-        image_params,
-        sys_prompt
+        sys_prompt,
+        image_params
     );
-
 
     // println!("Executing query:\n{}", query); // Debug output
 
