@@ -10,7 +10,7 @@ use parse_response::parse_response;
 
 
 #[post("/generate")]
-pub async fn generate_gemma (payload: web::Json<Payload>,pool: web::Data<Pool<Postgres>>) -> Result<HttpResponse, Error>  {
+pub async fn generate_gemma (payload: web::Json<Payload>, pool: web::Data<Pool<Postgres>>) -> Result<HttpResponse, Error>  {
   dotenv::dotenv().ok();
   let req = payload.into_inner();
 

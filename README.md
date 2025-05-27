@@ -366,4 +366,23 @@ sudo docker exec -i pgai-db-1 bash -c '
   sed -i "1s/old_col_name/new_col_name/" /tmp/shiko_test_products.csv
 '
 ```
-# scan-guru-backend
+
+# Authentication for shops
+
+CREATE TABLE public.temp_table
+(
+id uuid DEFAULT gen_random_uuid(),
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+subcription_ends TIMESTAMP
+name VARCHAR,
+domain VARCHAR,
+platform VARCHAR,
+status VARCHAR,
+plan VARCHAR,
+sys_prompt VARCHAR,
+db_table VARCHAR,
+db VARCHAR,
+db_pw VARCHAR,
+email VARCHAR
+);

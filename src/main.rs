@@ -5,8 +5,9 @@ use sqlx::{postgres::PgPoolOptions};
 mod init_pgai;
 use init_pgai::init_pgai;
 use std::time::Duration;
-use routes::generate_gemma::generate_gemma;
+use routes::{generate_gemma::generate_gemma, setup_store_database::setup_store_database, create_store::create_store};
 use actix_cors::Cors;
+use uuid::Uuid;
 
 #[actix_web::main]
 async fn main() -> Result<(), Error> {
@@ -21,6 +22,10 @@ async fn main() -> Result<(), Error> {
         .connect(&database_url)
         .await
         .expect("Error connecting to pool");
+
+    let id = Uuid::new_v4();
+
+    println!("{}", id);
 
     init_pgai(pool.clone()).await?;
 
@@ -42,6 +47,8 @@ async fn main() -> Result<(), Error> {
         )
         .app_data(web::Data::new(pool.clone()))
         .service(generate_gemma)
+        .service(setup_store_database)
+        .service(create_store)
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

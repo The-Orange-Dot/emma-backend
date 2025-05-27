@@ -1,6 +1,5 @@
 use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
-use crate::models::generation_models::ImageData;
 use crate::models::generation_models::{Payload};
 
 pub async fn add_products_suggestion(
