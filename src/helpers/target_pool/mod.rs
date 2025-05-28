@@ -9,6 +9,9 @@ pub fn target_account_pool(
 ) -> Pool<Postgres> {
     let account_uuid = string_to_uuid(account_id);
 
+
+    println!("{}", account_uuid.to_string());
+
     account_pools.0.get(&account_uuid)
         .ok_or_else(|| actix_web::error::ErrorNotFound("Account not found"))
         .expect("Account pool not found")

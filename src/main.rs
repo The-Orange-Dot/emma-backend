@@ -4,7 +4,7 @@ mod models;
 use helpers::init_all_account_connections::init_all_account_connections;
 use sqlx::{postgres::PgPoolOptions};
 mod init;
-use init::{init_pgai, create_accounts_table::create_accounts_table};
+use init::{preload_model::preload_model, init_pgai, create_accounts_table::create_accounts_table};
 use std::time::Duration;
 use routes::{generate_gemma::generate_gemma, 
     create_account::create_account, 
@@ -36,7 +36,16 @@ async fn main() -> Result<(), Error> {
     let account_pools = init_all_account_connections(admin_pool.clone(), admin_url.clone())
         .await?;
 
-    init_pgai(admin_pool.clone()).await?;
+    for (account_id, pool) in &account_pools.0 {
+        println!("Adding embedder into {}", account_id);
+        init_pgai(pool.clone()).await?;
+    }
+
+    let _preloads_model = preload_model(admin_pool.clone())
+        .await?;
+
+
+    println!("===[ Successfully started ]===");
 
     HttpServer::new(move || {
         App::new()

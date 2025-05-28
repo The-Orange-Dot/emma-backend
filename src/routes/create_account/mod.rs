@@ -47,7 +47,6 @@ pub async fn create_account(
     ensure_store_auth_table(&admin_conn)
     .await?;
 
-
     sqlx::query(&format!("CREATE DATABASE {}", snake_case_name))
         .execute(&admin_conn)
         .await?;
@@ -98,15 +97,47 @@ pub async fn create_account(
 
     transaction.commit().await?;
     
-    let store_db_url = get_account_psql_link(db_username, encrypted_db_password, database_url);
+    let account_db_url = get_account_psql_link(db_username, encrypted_db_password, database_url);
    
-    let _store_pool = PgPoolOptions::new()
+    let account_conn = PgPoolOptions::new()
         .max_connections(2)
-        .connect(&store_db_url)
+        .connect(&account_db_url)
         .await?;
 
     let _ = install_extensions(&admin_url, &snake_case_name)
         .await;
+
+    let new_store_table_if_not_created = sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS stores (
+            id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+            account_id UUID NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            store_name VARCHAR(255),
+            store_table VARCHAR(255),
+            domain VARCHAR(255),
+            platform VARCHAR(50),
+            sys_prompt TEXT,
+            UNIQUE(store_name, store_table, domain)
+        )
+        "#
+    )
+    .execute(&account_conn)
+    .await;
+
+    match new_store_table_if_not_created {
+      Ok(_) => {
+        println!("Table 'stores' has been created for {}.", &req.username)
+      }
+
+      Err(err) => {
+        HttpResponse::InternalServerError().json(serde_json::json!({
+          "status": "error",
+          "message": format!("Failed to create 'store' table for {}: {}", &req.username, err)
+        }));
+      }
+    }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "db_name ": snake_case_name,

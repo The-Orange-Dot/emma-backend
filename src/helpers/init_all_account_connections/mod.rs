@@ -28,27 +28,27 @@ pub async fn init_all_account_connections(
     let mut account_pools = HashMap::new();
     
     for account in accounts {
-        let database_url = std::env::var("POSTGRES_URL")
+        let postgres_url = std::env::var("POSTGRES_URL")
             .expect("Postgres URL has not been set for initializing account connections");
     
-    let _ = install_extensions(&admin_url, &account.username)
-            .await;
+        let _ = install_extensions(&admin_url, &account.username)
+                .await;
 
-        let store_db_url = get_account_psql_link(
+        let account_db_url = get_account_psql_link(
             account.username.clone(), 
             account.db_password.clone(), 
-            database_url
+            postgres_url
         );
 
-        let store_pool = PgPoolOptions::new()
+        let account_pool = PgPoolOptions::new()
             .max_connections(2)
-            .connect(&store_db_url)
+            .connect(&account_db_url)
             .await
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-            println!("Connected to {} account pool", account.username);
+        println!("Connected to {} account pool", account.username);
 
-        account_pools.insert(account.id, store_pool);
+        account_pools.insert(account.id, account_pool);
     }
     
     Ok(AccountPools(account_pools))

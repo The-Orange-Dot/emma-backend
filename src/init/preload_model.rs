@@ -2,19 +2,19 @@ use sqlx::{self, Postgres, Pool};
 use actix_web::{Result, Error};
 
 pub async fn preload_model (pool: Pool<Postgres>) -> Result<(), Error> {
-dotenv::dotenv().ok();
+  dotenv::dotenv().ok();
 
-let model = std::env::var("LLM_MODEL")
-.expect("Failed to initialize model for preload.");
+  let model = std::env::var("LLM_MODEL")
+  .expect("Failed to initialize model for preload.");
 
-let query = format!(
-  "SELECT ai.ollama_generate(
-      '{}',
-      ''
-  )", model
-);
+  let query = format!(
+    "SELECT ai.ollama_generate(
+        '{}',
+        ''
+    )", model
+  );
 
-let preloads_model = sqlx::query(
+  let preloads_model = sqlx::query(
     &query
   ).execute(&pool)
   .await;

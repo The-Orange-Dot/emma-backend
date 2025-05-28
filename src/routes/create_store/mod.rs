@@ -1,6 +1,7 @@
 use actix_web::{post, HttpResponse, web, Result, Error};
 use serde::{Deserialize, Serialize};
 use crate::helpers::to_snake_case::to_snake_case;
+use crate::init::update_embed_data::{update_embed_data};
 use crate::models::pools_models::{ AccountPools};
 use crate::helpers::target_pool::{ target_account_pool};
 use crate::helpers::modify_types::string_to_uuid;
@@ -32,37 +33,7 @@ pub async fn create_store(
     let platform = &payload.platform;
     let account_uuid = string_to_uuid(id);
 
-    let new_store_table_if_not_created = sqlx::query(
-          r#"
-          CREATE TABLE IF NOT EXISTS stores (
-              id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-              account_id UUID NOT NULL,
-              created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-              store_name VARCHAR(255),
-              store_table VARCHAR(255),
-              domain VARCHAR(255),
-              platform VARCHAR(50),
-              sys_prompt TEXT,
-              UNIQUE(store_name, store_table, domain)
-          )
-          "#
-      )
-      .execute(&account_conn)
-      .await;
 
-    match new_store_table_if_not_created {
-      Ok(_) => {
-        println!("Table 'stores' has been created for {}.", store_name)
-      }
-
-      Err(err) => {
-        HttpResponse::InternalServerError().json(serde_json::json!({
-          "status": "error",
-          "message": format!("Failed to create 'store' table for {}: {}", store_name, err)
-        }));
-      }
-    }
 
     let new_store = sqlx::query(
       "INSERT INTO stores (account_id, store_name, store_table, domain, platform, sys_prompt) VALUES ($1, $2, $3, $4, $5, $6)"
@@ -109,6 +80,7 @@ pub async fn create_store(
           seo_title VARCHAR(255),
           seo_description VARCHAR(255),
           status VARCHAR(50) NOT NULL,
+          published VARCHAR(50),
           category VARCHAR(50),
           tags VARCHAR(255),
           type VARCHAR(50),
@@ -123,7 +95,9 @@ pub async fn create_store(
 
   match new_products_table {
     Ok(_) => {
-        println!("Product table for '{}' has been created", store_name);
+        update_embed_data(account_conn.clone(), 60 * 60 * 12, store_table_name.clone())
+          .await;
+        println!("Product table for '{}' has been created", &store_table_name);
     },
     Err(err) => {
         eprintln!("Failed to create products table '{}': {}", store_name, err);

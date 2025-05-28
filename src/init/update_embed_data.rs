@@ -9,23 +9,22 @@ use chrono::Utc;
 // IF THE PRODUCT HAS NO EMBEDDED VALUE IN EMBEDDING COL - ADD IT
 // IF THE PRODUCT HAS BEEN UPDATED WITHIN THE TIME BETWEEN THE RUNS - UPDATE IT
 
-pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64) -> tokio::task::JoinHandle<()> {
+pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_name: String) -> tokio::task::JoinHandle<()> {
     task::spawn(async move {
         // Add panic hook to catch any silent failures
         panic::set_hook(Box::new(|panic_info| {
             eprintln!("Task panicked: {:?}", panic_info);
         }));
 
-        let operation = || async {
-            let current_time = Utc::now().naive_utc();
-            let result = sqlx::query(r#"
+        let query = format!(
+            "
                 WITH target_products AS (
                     SELECT id 
-                    FROM public.products 
+                    FROM {}_products
                     WHERE 
                         EMBEDDING IS NULL 
                         OR updated_at > COALESCE(
-                            (SELECT MAX(embedding_updated_at) FROM products),
+                            (SELECT MAX(updated_at) FROM {}_products),
                             TIMESTAMP '1970-01-01'
                         )
                     ORDER BY
@@ -34,7 +33,7 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64) -> tokio:
                     LIMIT 100
                     FOR UPDATE SKIP LOCKED
                 )
-                UPDATE products 
+                UPDATE {}_products 
                 SET 
                     EMBEDDING = ai.ollama_embed(
                         'nomic-embed-text', 
@@ -46,15 +45,26 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64) -> tokio:
                         name, price, description, tags, seo_description, 
                         seo_title, category, published, status)
                     ),
-                    embedding_updated_at = $1
+                    updated_at = $1
                 WHERE id IN (SELECT id FROM target_products)
-            "#)
+            ", 
+            store_name, 
+            store_name, 
+            store_name
+        );
+
+        let operation = || async {
+            let current_time = Utc::now().naive_utc();
+            let result = sqlx::query(&query)
             .bind(current_time)
             .execute(&pool)
             .await;
 
             match result {
-                Ok(res) => Ok(res),
+                Ok(res) => {
+                    // println!("Embedder now checking products on {} ", store_name);
+                    Ok(res)
+                },
                 Err(e) => {
                     println!("[DEBUG] Update error: {:?}", e);
                     Err(backoff::Error::transient(e))
@@ -79,12 +89,12 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64) -> tokio:
                     
                     if rows == 0 {
                         // println!("[SLEEP] No rows to process, sleeping...");
-                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        tokio::time::sleep(Duration::from_secs(timer)).await;
                     }
                 }
                 Err(e) => {
                     println!("[FATAL ERROR] {:?}", e);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    tokio::time::sleep(Duration::from_secs(timer)).await;
                 }
             }
         }
