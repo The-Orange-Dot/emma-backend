@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::helpers::to_snake_case::to_snake_case;
 use crate::models::pools_models::{AdminPool, AccountPools};
+use crate::helpers::target_pool::{target_admin_pool, target_account_pool};
 
 #[derive(Serialize, Deserialize)]
 struct Params {
@@ -24,19 +25,8 @@ pub async fn create_store(
     account_id: web::Path<String>,  
     payload: web::Json<Payload> 
   ) -> Result<HttpResponse, Error> {
-    let admin_conn = &admin_pool.0; 
-    
-    let account_uuid = Uuid::parse_str(&account_id)
-        .map_err(|_| actix_web::error::ErrorBadRequest("Invalid UUID format"))?;
-    
-    // Get the pool
-    let account_conn = account_pools.0.get(&account_uuid)
-        .ok_or_else(|| actix_web::error::ErrorNotFound("Account not found"))?;
-    
-
-    dotenv::dotenv().ok();
-    let database_url = std::env::var("POSTGRES_URL")
-      .expect("No database url was initialized for the database");
+    let admin_conn = target_admin_pool(admin_pool);
+    let account_conn = target_account_pool(account_id.to_string(), account_pools);
 
     let mut transaction: Transaction<'static, Postgres> = admin_conn.begin()
       .await.expect("Error with transaction for creating store");
@@ -95,7 +85,7 @@ pub async fn create_store(
           )
           "#
       )
-      .execute(account_conn)
+      .execute(&account_conn)
       .await;
 
     let _new_store = sqlx::query(
@@ -107,7 +97,7 @@ pub async fn create_store(
       .bind(domain)
       .bind(platform)
       .bind("")
-      .execute(account_conn)
+      .execute(&account_conn)
       .await.expect("TEST");
 
   // let _new_products = sqlx::query(
