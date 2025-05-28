@@ -3,13 +3,14 @@ mod routes;
 mod models;
 use helpers::init_all_account_connections::init_all_account_connections;
 use sqlx::{postgres::PgPoolOptions};
-mod init_pgai;
-use init_pgai::init_pgai;
+mod init;
+use init::{init_pgai, create_accounts_table::create_accounts_table};
 use std::time::Duration;
 use routes::{generate_gemma::generate_gemma, 
     create_account::create_account, 
     create_store::create_store,
-    update_store_sys_prompt::update_store_sys_prompt
+    update_store_sys_prompt::update_store_sys_prompt,
+    get_stores::get_stores
 };
 use actix_cors::Cors;
 mod helpers;
@@ -19,18 +20,20 @@ use models::pools_models::{AdminPool};
 async fn main() -> Result<(), Error> {
 
     dotenv::dotenv().ok();
-    let database_url = std::env::var("DATABASE_URL")
+    let admin_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set in environment variables");
 
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
         .max_connections(10)
         .acquire_timeout(Duration::from_secs(2))
-        .connect(&database_url)
+        .connect(&format!("{}/postgres", &admin_url))
         .await
         .expect("Error connecting to pool");
 
-    let account_pools = init_all_account_connections(admin_pool.clone())
+    let _init_accounts_table = create_accounts_table(admin_pool.clone()).await;
+
+    let account_pools = init_all_account_connections(admin_pool.clone(), admin_url.clone())
         .await?;
 
     init_pgai(admin_pool.clone()).await?;
@@ -41,7 +44,7 @@ async fn main() -> Result<(), Error> {
             Cors::default()
             // Eventually add CORS
             // .allowed_origin("http://your-nextjs-app.com")
-            .allowed_methods(["POST"])
+            .allowed_methods(["POST", "DELETE", "GET"])
         )
         .app_data(
             web::PayloadConfig::default()
@@ -53,10 +56,12 @@ async fn main() -> Result<(), Error> {
         )
         .app_data(web::Data::new(account_pools.clone()))
         .app_data(web::Data::new(AdminPool(admin_pool.clone())))
+        .app_data(web::Data::new(admin_url.clone()))
         .service(generate_gemma)
         .service(create_account)
         .service(create_store)
         .service(update_store_sys_prompt)
+        .service(get_stores)
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

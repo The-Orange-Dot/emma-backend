@@ -3,6 +3,7 @@ use uuid::Uuid;
 use super::get_account_psql_link::get_account_psql_link;
 use crate::models::pools_models::AccountPools;
 use std::collections::HashMap;
+use crate::helpers::install_extensions::install_extensions;
 
 #[derive(FromRow)]
 struct AccountRes {
@@ -12,7 +13,8 @@ struct AccountRes {
 }
 
 pub async fn init_all_account_connections(
-    pool: Pool<Postgres>
+    pool: Pool<Postgres>,
+    admin_url: String
 ) -> Result<AccountPools, std::io::Error> {
     dotenv::dotenv().ok();
 
@@ -29,6 +31,9 @@ pub async fn init_all_account_connections(
         let database_url = std::env::var("POSTGRES_URL")
             .expect("Postgres URL has not been set for initializing account connections");
     
+    let _ = install_extensions(&admin_url, &account.username)
+            .await;
+
         let store_db_url = get_account_psql_link(
             account.username.clone(), 
             account.db_password.clone(), 

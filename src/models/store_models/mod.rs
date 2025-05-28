@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use sqlx::FromRow;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoreCredentials {
@@ -21,16 +22,15 @@ pub struct Payload {
 }
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct Store {
   pub id: Uuid,
-  pub store_id: String,
+  pub account_id: Uuid,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
-  pub handle: String,
-  pub name: String,
-  pub description: String,
-  pub vendor: String,
-  pub price: f32,
-  pub status: String
+  pub store_name: String,
+  pub store_table: String,
+  pub domain: String,
+  pub platform: String,
+  pub sys_prompt: String
 }

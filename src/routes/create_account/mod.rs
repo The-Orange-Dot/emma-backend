@@ -4,8 +4,16 @@ use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString};
 use rand_core::OsRng;
 use std::error::Error;
-use crate::{helpers::get_account_psql_link::get_account_psql_link, models::account_models::Payload};
-use crate::helpers::{generate_random_password::generate_random_password, to_snake_case::to_snake_case};
+use crate::{
+    models::account_models::Payload,
+};
+use crate::helpers::{
+    generate_random_password::generate_random_password, 
+    to_snake_case::to_snake_case,
+    get_account_psql_link::get_account_psql_link,
+    target_pool::target_admin_pool,
+    install_extensions::install_extensions
+};
 use password_encoder::{encrypt_password, get_or_create_dev_key};
 
 mod ensure_store_auth_table;
@@ -16,10 +24,12 @@ use crate::models::pools_models::{AdminPool};
 #[post("/signup")]
 pub async fn create_account(
     admin_pool: web::Data<AdminPool>,
+    admin_url: web::Data<String>,
     payload: web::Json<Payload>,
 ) -> Result<HttpResponse, Box<dyn Error>> {
     let req = payload.into_inner();
-    let admin_conn = &admin_pool.0; 
+    let admin_conn = target_admin_pool(admin_pool);
+    let admin_url = admin_url.into_inner();
 
     dotenv::dotenv().ok();
     let database_url = std::env::var("POSTGRES_URL")
@@ -39,7 +49,7 @@ pub async fn create_account(
 
 
     sqlx::query(&format!("CREATE DATABASE {}", snake_case_name))
-        .execute(admin_conn)
+        .execute(&admin_conn)
         .await?;
 
     // CHANGE THIS DURING PRODUCTION
@@ -90,15 +100,14 @@ pub async fn create_account(
     
     let store_db_url = get_account_psql_link(db_username, encrypted_db_password, database_url);
    
-    let store_pool = PgPoolOptions::new()
+    let _store_pool = PgPoolOptions::new()
         .max_connections(2)
         .connect(&store_db_url)
         .await?;
 
-    sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-        .execute(&store_pool)
-        .await?;
-        
+    let _ = install_extensions(&admin_url, &snake_case_name)
+        .await;
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "db_name ": snake_case_name,
         "dashboard_username ": dashboard_username,

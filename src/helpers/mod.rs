@@ -3,3 +3,5 @@ pub mod generate_random_password;
 pub mod to_snake_case;
 pub mod init_all_account_connections;
 pub mod target_pool;
+pub mod modify_types;
+pub mod install_extensions;
