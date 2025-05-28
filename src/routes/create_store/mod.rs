@@ -1,8 +1,9 @@
 use actix_web::{post, HttpResponse, web, Result, Error};
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Transaction};
+use sqlx::{Postgres, Transaction};
 use serde::{Deserialize, Serialize};
-use crate::models::account_models::Account;
 use uuid::Uuid;
+use crate::helpers::to_snake_case::to_snake_case;
+use crate::models::pools_models::{AdminPool, AccountPools};
 
 #[derive(Serialize, Deserialize)]
 struct Params {
@@ -16,93 +17,98 @@ domain: String,
 platform: String,
 }
 
-fn to_snake_case(input: &str) -> String {
-    input
-        .to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect::<String>()
-        .replace(' ', "_")
-}
-
 #[post("/stores/{account_id}")]
 pub async fn create_store(
-    admin_pool: actix_web::web::Data<Pool<Postgres>>, 
+    admin_pool: web::Data<AdminPool>,
+    account_pools: web::Data<AccountPools>,
     account_id: web::Path<String>,  
     payload: web::Json<Payload> 
   ) -> Result<HttpResponse, Error> {
+    let admin_conn = &admin_pool.0; 
     
+    let account_uuid = Uuid::parse_str(&account_id)
+        .map_err(|_| actix_web::error::ErrorBadRequest("Invalid UUID format"))?;
+    
+    // Get the pool
+    let account_conn = account_pools.0.get(&account_uuid)
+        .ok_or_else(|| actix_web::error::ErrorNotFound("Account not found"))?;
+    
+
     dotenv::dotenv().ok();
     let database_url = std::env::var("POSTGRES_URL")
       .expect("No database url was initialized for the database");
 
-    let mut transaction: Transaction<'static, Postgres> = admin_pool.begin()
+    let mut transaction: Transaction<'static, Postgres> = admin_conn.begin()
       .await.expect("Error with transaction for creating store");
 
     let account_uuid = Uuid::parse_str(&account_id).map_err(|err| {
         actix_web::error::ErrorBadRequest(format!("Invalid UUID: {}", err))
     })?;
 
-    let account = sqlx::query_as::<_, Account>("SELECT username FROM public.accounts WHERE id = $1")
-    .bind(account_uuid)
-    .fetch_one(admin_pool.get_ref())
+    struct AccountRes {
+       username: String,
+       id: Option<Uuid>,
+       status: Option<String>,
+       plan: Option<String>,
+       db_password: String
+    }
+
+    let account = sqlx::query_as!(
+        AccountRes,
+        r#"
+        SELECT id, username, status, plan, db_password FROM public.accounts 
+        WHERE id = $1
+        "#,
+        account_uuid
+    )
+    .fetch_one(&mut *transaction)
     .await
     .map_err(|err| {
-      if let sqlx::Error::RowNotFound = err {
-            eprintln!("No account found");
-            actix_web::error::ErrorNotFound("Account not found")
-        } else {
-            eprintln!("Error fetching from 'accounts' table: {}", err);
-            actix_web::error::ErrorInternalServerError(format!("Error fetching from accounts table: {}", err))
-        }
+        if let sqlx::Error::RowNotFound = err {
+              eprintln!("No account found");
+              actix_web::error::ErrorNotFound("Account not found")
+          } else {
+              eprintln!("Error fetching from 'accounts' table: {}", err);
+              actix_web::error::ErrorInternalServerError(format!("Error fetching from accounts table: {}", err))
+          }
     })?;
 
-  // Connect to new database to create tables
-  let store_db_url = format!(
-      "postgres://{}:{}@{}/{}",
-      account.username, account.db_password, &database_url, account.username
-  );
+    transaction.commit().await.expect("Unable to complete transaction");
 
-  let account_pool = PgPoolOptions::new()
-    .max_connections(1)
-    .connect(&store_db_url)
-    .await
-    .expect("Error connecting to account pool");
+    let store_name = &payload.store_name;
+    let store_table_name = to_snake_case(store_name);
+    let domain = &payload.domain;
+    let platform = &payload.platform;
 
-  let store_name = &payload.store_name;
-  let store_table_name = to_snake_case(store_name);
-  let domain = &payload.domain;
-  let platform = &payload.platform;
+    let _new_store_table_if_not_created = sqlx::query(
+          r#"
+          CREATE TABLE IF NOT EXISTS stores (
+              id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+              account_id UUID NOT NULL,
+              created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+              store_name VARCHAR(255),
+              store_table VARCHAR(255),
+              domain VARCHAR(255),
+              platform VARCHAR(50),
+              sys_prompt TEXT
+          )
+          "#
+      )
+      .execute(account_conn)
+      .await;
 
-  // Will create the table if it doesn't exist
-  let _new_store_table = sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS stores (
-            id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-            account_id INT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            store_name VARCHAR(255),
-            store_table VARCHAR(255),
-            domain VARCHAR(255),
-            platform VARCHAR(50),
-            sys_prompt TEXT
-        )
-        "#
+    let _new_store = sqlx::query(
+      "INSERT INTO stores (account_id, store_name, store_table, domain, platform, sys_prompt) VALUES ($1, $2, $3, $4, $5, $6)"
     )
-    .execute(&account_pool)
-    .await;
-
-  let _new_store = sqlx::query(
-    "INSERT INTO stores (store_name, store_table, domain, platform, sys_prompt) VALUES ($1, $2, $3, $4, $5)"
-  )
-    .bind(store_name)
-    .bind(store_table_name)
-    .bind(domain)
-    .bind(platform)
-    .bind("")
-    .execute(&account_pool)
-    .await;
+      .bind(account.id)
+      .bind(store_name)
+      .bind(store_table_name)
+      .bind(domain)
+      .bind(platform)
+      .bind("")
+      .execute(account_conn)
+      .await.expect("TEST");
 
   // let _new_products = sqlx::query(
   //     r#"
@@ -125,8 +131,6 @@ pub async fn create_store(
   //   .bind(store_name)
   //   .execute(&account_pool)
   //   .await;
-
-    
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
       "status": "success",

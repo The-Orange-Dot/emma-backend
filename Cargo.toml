@@ -27,3 +27,4 @@ actix-multipart = "0.7.2"
 rand = "0.9.1"
 argon2 = { version = "0.5", features = ["std"] }
 rand_core = { version = "0.6", features = ["std"] }
+password_encoder = { path = "./password_encoder" }

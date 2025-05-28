@@ -1,79 +1,55 @@
 use actix_web::{web, HttpResponse, post};
-use sqlx::{postgres::{PgPool, PgPoolOptions}, Postgres, Transaction};
+use sqlx::{postgres::{PgPoolOptions}, Postgres, Transaction};
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString};
 use rand_core::OsRng;
 use std::error::Error;
-use crate::models::store_models::Payload;
-use rand::rng;
+use crate::{helpers::get_account_psql_link::get_account_psql_link, models::account_models::Payload};
+use crate::helpers::{generate_random_password::generate_random_password, to_snake_case::to_snake_case};
+use password_encoder::{encrypt_password, get_or_create_dev_key};
 
 mod ensure_store_auth_table;
 use ensure_store_auth_table::ensure_store_auth_table;
 
-mod create_store_tables;
-use create_store_tables::create_store_tables;
-
-fn to_snake_case(input: &str) -> String {
-    input
-        .to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect::<String>()
-        .replace(' ', "_")
-}
-
-fn generate_random_password(length: usize) -> String {
-    use rand::Rng;
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-                            abcdefghijklmnopqrstuvwxyz\
-                            0123456789";
-    
-    let mut rng = rng();
-    let password: String = (0..length)
-        .map(|_| {
-            let idx = rng.random_range(0..CHARSET.len());
-            CHARSET[idx] as char
-        })
-        .collect();
-    
-    password
-}
+use crate::models::pools_models::{AdminPool};
 
 #[post("/signup")]
-pub async fn setup_store_database(
-    admin_pool: web::Data<PgPool>,
+pub async fn create_account(
+    admin_pool: web::Data<AdminPool>,
     payload: web::Json<Payload>,
 ) -> Result<HttpResponse, Box<dyn Error>> {
     let req = payload.into_inner();
-    let store_name = &req.store_name;
-    let email = &req.email;
-    let last_name = &req.last_name;
-    let first_name = &req.first_name;
+    let admin_conn = &admin_pool.0; 
 
     dotenv::dotenv().ok();
     let database_url = std::env::var("POSTGRES_URL")
         .expect("URL for database has not been set for account creation");
 
-    let snake_case_name = to_snake_case(store_name);
-    let db_username = format!("db_{}", snake_case_name);
+    let snake_case_name = to_snake_case(&req.username);
+    let db_username = format!("{}", snake_case_name);
     let dashboard_username = format!("user_{}", snake_case_name);
     
     let db_password = generate_random_password(24);
     let dashboard_password = req.password;
     
-    let mut transaction: Transaction<'static, Postgres> = admin_pool.begin().await?;
+    let mut transaction: Transaction<'static, Postgres> = admin_conn.begin().await?;
 
-
-    ensure_store_auth_table(admin_pool.get_ref())
+    ensure_store_auth_table(&admin_conn)
     .await?;
 
+
     sqlx::query(&format!("CREATE DATABASE {}", snake_case_name))
-        .execute(admin_pool.get_ref())
+        .execute(admin_conn)
         .await?;
+
+    // CHANGE THIS DURING PRODUCTION
+    let key = get_or_create_dev_key()?;
+    let encrypted_db_password = encrypt_password(&db_password, &key)
+        .expect("Failed to encrypt password");
 
     sqlx::query(&format!(
         "CREATE USER {} WITH PASSWORD '{}' NOINHERIT NOCREATEDB NOCREATEROLE",
-        db_username, db_password
+        db_username, &db_password
     ))
     .execute(&mut *transaction)
     .await?;
@@ -98,41 +74,33 @@ pub async fn setup_store_database(
         .hash_password(dashboard_password.as_bytes(), &salt)?
         .to_string();
 
-    let db_hashed_password = Argon2::default()
-        .hash_password(db_password.as_bytes(), &salt)?
-        .to_string();
-    
     sqlx::query(
         "INSERT INTO accounts (username, email, password, first_name, last_name, db_password) VALUES ($1, $2, $3, $4, $5, $6)"
     )
     .bind(&snake_case_name)
-    .bind(&email)
+    .bind(&req.email)
     .bind(hashed_password)
-    .bind(first_name)
-    .bind(last_name)
-    .bind(&db_hashed_password)
+    .bind(&req.first_name)
+    .bind(&req.last_name)
+    .bind(&encrypted_db_password)
     .execute(&mut *transaction)
     .await?;
 
     transaction.commit().await?;
-
-    // Connect to new database to create tables
-    let store_db_url = format!(
-        "postgres://{}:{}@{}/{}",
-        db_username, db_password, database_url, snake_case_name
-    );
+    
+    let store_db_url = get_account_psql_link(db_username, encrypted_db_password, database_url);
+   
     let store_pool = PgPoolOptions::new()
-        .max_connections(1)
+        .max_connections(2)
         .connect(&store_db_url)
         .await?;
 
-    create_store_tables(&store_pool).await?;
-    
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+        .execute(&store_pool)
+        .await?;
+        
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "db_name ": snake_case_name,
-        "db_username ": db_username,
-        "registered email ": email,
-        "db_password ": db_password,
         "dashboard_username ": dashboard_username,
         "dashboard_password ": dashboard_password,
     })))

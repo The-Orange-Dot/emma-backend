@@ -1,0 +1,12 @@
+[package]
+name = "password_encoder"
+version = "0.1.0"
+edition = "2021"
+description = "Secure password encryption using AES-256-GCM"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = "0.21"
+generic-array = "0.14"
+rand_core = "0.6"

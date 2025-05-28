@@ -23,7 +23,7 @@ pub struct Payload {
 
 #[derive(Serialize, Deserialize)]
 pub struct Store {
-  pub id: String,
+  pub id: Uuid,
   pub store_id: String,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,

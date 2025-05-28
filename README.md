@@ -369,6 +369,10 @@ sudo docker exec -i pgai-db-1 bash -c '
 
 # Authentication for shops
 
+
+
+GRANT INSERT ON YourTable TO SomeUser
+
 CREATE TABLE public.temp_table
 (
 id uuid DEFAULT gen_random_uuid(),
