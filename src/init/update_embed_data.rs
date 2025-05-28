@@ -5,10 +5,6 @@ use tokio::time::{Duration, Instant};
 use std::panic;
 use chrono::Utc;
 
-// NEEDED TO DO:
-// IF THE PRODUCT HAS NO EMBEDDED VALUE IN EMBEDDING COL - ADD IT
-// IF THE PRODUCT HAS BEEN UPDATED WITHIN THE TIME BETWEEN THE RUNS - UPDATE IT
-
 pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_name: String) -> tokio::task::JoinHandle<()> {
     task::spawn(async move {
         // Add panic hook to catch any silent failures
@@ -62,19 +58,23 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_nam
 
             match result {
                 Ok(res) => {
-                    // println!("Embedder now checking products on {} ", store_name);
+                    println!("Embedder now checking products on {} ", store_name);
                     Ok(res)
                 },
                 Err(e) => {
-                    println!("[DEBUG] Update error: {:?}", e);
+                    // println!("[DEBUG] Update error: {:?}", e);
+                    println!("Cannot find table {}", store_name);
                     Err(backoff::Error::transient(e))
                 }
             }
         };
         
         let backoff = ExponentialBackoff {
-            max_elapsed_time: Some(Duration::from_secs(timer)),
-            ..Default::default()
+            initial_interval: Duration::from_secs(2),
+            multiplier: 2.0,                          
+            max_interval: Duration::from_secs(15),    
+            max_elapsed_time: Some(Duration::from_secs(7)),
+            ..ExponentialBackoff::default()
         };
 
         loop {
@@ -94,7 +94,8 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_nam
                 }
                 Err(e) => {
                     println!("[FATAL ERROR] {:?}", e);
-                    tokio::time::sleep(Duration::from_secs(timer)).await;
+                    println!("Disconnecting embedder for {}", store_name);
+                    break;
                 }
             }
         }

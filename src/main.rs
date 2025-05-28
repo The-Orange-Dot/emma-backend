@@ -10,7 +10,8 @@ use routes::{generate_gemma::generate_gemma,
     create_account::create_account, 
     create_store::create_store,
     update_store_sys_prompt::update_store_sys_prompt,
-    get_stores::get_stores
+    get_stores::get_stores,
+    delete_store::delete_store
 };
 use actix_cors::Cors;
 mod helpers;
@@ -36,8 +37,8 @@ async fn main() -> Result<(), Error> {
     let account_pools = init_all_account_connections(admin_pool.clone(), admin_url.clone())
         .await?;
 
-    for (account_id, pool) in &account_pools.0 {
-        println!("Adding embedder into {}", account_id);
+    for (_account_id, pool) in &account_pools.0 {
+        // println!("Adding embedder into {}", account_id);
         init_pgai(pool.clone()).await?;
     }
 
@@ -71,6 +72,7 @@ async fn main() -> Result<(), Error> {
         .service(create_store)
         .service(update_store_sys_prompt)
         .service(get_stores)
+        .service(delete_store)
     })     
         .bind(("127.0.0.1", 8080))?
         .run()
