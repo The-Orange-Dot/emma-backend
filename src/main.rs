@@ -11,7 +11,8 @@ use routes::{generate_gemma::generate_gemma,
     create_store::create_store,
     update_store_sys_prompt::update_store_sys_prompt,
     get_stores::get_stores,
-    delete_store::delete_store
+    delete_store::delete_store,
+    login_account::login_account
 };
 use actix_cors::Cors;
 mod helpers;
@@ -54,7 +55,7 @@ async fn main() -> Result<(), Error> {
             Cors::default()
             // Eventually add CORS
             // .allowed_origin("http://your-nextjs-app.com")
-            .allowed_methods(["POST", "DELETE", "GET"])
+            .allowed_methods(["POST", "DELETE", "GET", "PUT"])
         )
         .app_data(
             web::PayloadConfig::default()
@@ -67,12 +68,13 @@ async fn main() -> Result<(), Error> {
         .app_data(web::Data::new(account_pools.clone()))
         .app_data(web::Data::new(AdminPool(admin_pool.clone())))
         .app_data(web::Data::new(admin_url.clone()))
-        .service(generate_gemma)
-        .service(create_account)
-        .service(create_store)
-        .service(update_store_sys_prompt)
-        .service(get_stores)
-        .service(delete_store)
+        .service(generate_gemma) // POST
+        .service(create_account) // POST
+        .service(create_store) // POST
+        .service(update_store_sys_prompt) // PUT
+        .service(get_stores) // GET
+        .service(delete_store) // DELETE
+        .service(login_account) // POST
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

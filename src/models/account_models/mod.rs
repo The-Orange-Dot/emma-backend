@@ -5,21 +5,21 @@ use sqlx::FromRow;
 
 #[derive(FromRow, Deserialize, Serialize)]
 pub struct Account {
-  pub id: Option<Uuid>,
+  pub id: Uuid,
   pub username: String,
-  pub email: Option<String>,
-  pub first_name: Option<String>,
-  pub last_name: Option<String>,
+  pub email: String,
+  pub first_name: String,
+  pub last_name: String,
   pub status: Option<String>,
   pub credits: Option<i32>,
   pub plan: Option<String>,
-  pub password: Option<String>,
-  pub encryption_nonce: Option<Vec<u8>>,
-  pub db_password: Option<String>,
-  pub subscription_ends: Option<DateTime<Utc>>,
-  pub created_at: Option<DateTime<Utc>>,
-  pub updated_at: Option<DateTime<Utc>>,
-  pub last_login_at: Option<DateTime<Utc>>
+  pub password: String,
+  // pub encryption_nonce: Option<Vec<u8>>,
+  pub db_password: String,
+  pub subscription_ends: DateTime<Utc>,
+  pub created_at: DateTime<Utc>,
+  pub updated_at: DateTime<Utc>,
+  pub last_login_at: DateTime<Utc>
 }
 
 #[derive(Serialize, Deserialize)]
