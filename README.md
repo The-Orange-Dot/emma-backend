@@ -369,8 +369,6 @@ sudo docker exec -i pgai-db-1 bash -c '
 
 # Authentication for shops
 
-
-
 GRANT INSERT ON YourTable TO SomeUser
 
 CREATE TABLE public.temp_table
@@ -390,3 +388,57 @@ db VARCHAR,
 db_pw VARCHAR,
 email VARCHAR
 );
+
+# Implementing shopify store api
+
+- Install the Storefront Headless App in the shopify app store
+
+- Create a new storefront (The storefront name doesnt matter)
+
+- Update the public api permission to only read products
+
+- Copy Storefront API public access token. NOT THE PRIVATE!
+
+- Copy the storename ex: ahfeia.myshopify.com will be "ahfeia"
+
+Dev reference:
+
+```
+curl -X POST \
+  https://{store-name}.myshopify.com/api/unstable/graphql.json \
+  -H 'Content-Type: application/json' \
+  -H 'X-Shopify-Storefront-Access-Token: {access-token}' \
+  -d '{
+    "query": "{
+      products(first: 3) {
+        edges {
+          node {
+            id
+            title
+          }
+        }
+      }
+    }"
+  }'
+```
+
+Example:
+
+```
+curl -X POST \
+  https://ahfeia.myshopify.com/api/unstable/graphql.json \
+  -H 'Content-Type: application/json' \
+  -H 'X-Shopify-Storefront-Access-Token: de3457427904215811be234te69a138ba' \
+  -d '{
+    "query": "{
+      products(first: 3) {
+        edges {
+          node {
+            id
+            title
+          }
+        }
+      }
+    }"
+  }'
+```

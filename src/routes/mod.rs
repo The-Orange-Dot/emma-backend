@@ -5,3 +5,4 @@ pub mod update_store_sys_prompt;
 pub mod get_stores;
 pub mod delete_store;
 pub mod login_account;
+pub mod update_products;

@@ -12,7 +12,8 @@ use routes::{generate_gemma::generate_gemma,
     update_store_sys_prompt::update_store_sys_prompt,
     get_stores::get_stores,
     delete_store::delete_store,
-    login_account::login_account
+    login_account::login_account,
+    update_products::update_products
 };
 use actix_cors::Cors;
 mod helpers;
@@ -38,14 +39,15 @@ async fn main() -> Result<(), Error> {
     let account_pools = init_all_account_connections(admin_pool.clone(), admin_url.clone())
         .await?;
 
+
     for (_account_id, pool) in &account_pools.0 {
         // println!("Adding embedder into {}", account_id);
         init_pgai(pool.clone()).await?;
     }
 
     let _preloads_model = preload_model(admin_pool.clone())
-        .await?;
-
+        .await
+        .expect("Could ne establish connection to LLM Server");
 
     println!("===[ Successfully started ]===");
 
@@ -75,6 +77,7 @@ async fn main() -> Result<(), Error> {
         .service(get_stores) // GET
         .service(delete_store) // DELETE
         .service(login_account) // POST
+        .service(update_products) // PUT
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

@@ -32,5 +32,8 @@ pub struct Store {
   pub store_table: String,
   pub domain: String,
   pub platform: String,
-  pub sys_prompt: String
+  pub sys_prompt: String,
+  // pub shopify_storefront_store_name: String,
+  // pub shopify_storefront_access_token: String
+  
 }

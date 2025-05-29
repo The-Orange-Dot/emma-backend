@@ -25,12 +25,10 @@ pub async fn create_store(
     payload: web::Json<Payload> 
   ) -> Result<HttpResponse, Error> {
     let account_conn = target_account_pool(account_id.to_string(), account_pools);
-
+    let Payload {store_name, domain, platform} = payload.into_inner();
     let id: String = account_id.into_inner();
-    let store_name = &payload.store_name;
-    let store_table_name = to_snake_case(store_name);
-    let domain = &payload.domain;
-    let platform = &payload.platform;
+    let store_table_name = to_snake_case(&store_name);
+
     let account_uuid = string_to_uuid(id);
 
 
@@ -39,7 +37,7 @@ pub async fn create_store(
       "INSERT INTO stores (account_id, store_name, store_table, domain, platform, sys_prompt) VALUES ($1, $2, $3, $4, $5, $6)"
     )
       .bind(account_uuid)
-      .bind(store_name)
+      .bind(&store_name)
       .bind(&store_table_name)
       .bind(domain)
       .bind(platform)
@@ -58,7 +56,7 @@ pub async fn create_store(
   if new_store.rows_affected() == 0 {
       return Ok(HttpResponse::NotFound().json(serde_json::json!({
           "status": "error",
-          "message": format!("Error creating store: {}", store_name),
+          "message": format!("Error creating store: {}", &store_name),
           "response": []
       })));
   }
@@ -67,7 +65,7 @@ pub async fn create_store(
 
   let create_new_product_table_query = format!("
   CREATE TABLE IF NOT EXISTS {} (
-          id SERIAL PRIMARY KEY,
+          id BIGSERIAL PRIMARY KEY,
           store_id UUID NOT NULL,
           created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -84,6 +82,8 @@ pub async fn create_store(
           category VARCHAR(50),
           tags VARCHAR(255),
           type VARCHAR(50),
+          shopify_storefront_access_token VARCHAR(255),
+          shopify_storefront_store_name VARCHAR(255),
           embedding vector(768),
           UNIQUE(handle)
       )
