@@ -82,8 +82,6 @@ pub async fn create_store(
           category VARCHAR(50),
           tags VARCHAR(255),
           type VARCHAR(50),
-          shopify_storefront_access_token VARCHAR(255),
-          shopify_storefront_store_name VARCHAR(255),
           embedding vector(768),
           UNIQUE(handle)
       )

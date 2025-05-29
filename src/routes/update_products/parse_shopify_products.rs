@@ -1,14 +1,17 @@
 use crate::models::products_models::{Product, shopify_products::ShopifyProductResponse};
 use chrono::{DateTime, NaiveDateTime};
 use chrono::format::ParseError;
+use uuid::Uuid;
 
 fn parse_shopify_datetime(dt_str: &str) -> Result<NaiveDateTime, ParseError> {
     DateTime::parse_from_rfc3339(dt_str)
         .map(|dt| dt.naive_utc())
 }
 
-pub fn parse_shopify_products(response: ShopifyProductResponse) -> Result<Vec<Product>, String> {
-    response.data.products.nodes.into_iter().map(|shopify_product| {
+pub fn parse_shopify_products(response: ShopifyProductResponse, store_uuid: Uuid) -> Result<Vec<Product>, String> {
+    response.data.products.nodes.into_iter()
+        .filter(|shopify_product| shopify_product.available_for_sale)
+        .map(|shopify_product| {
         let id_str = shopify_product.id
             .as_str()
             .split('/')
@@ -51,8 +54,9 @@ pub fn parse_shopify_products(response: ShopifyProductResponse) -> Result<Vec<Pr
             seo_title: shopify_product.seo.title.unwrap_or_default(),
             seo_description: shopify_product.seo.description.unwrap_or_default(),
             category: shopify_product.product_type,
-            status: if shopify_product.available_for_sale { "active" } else { "inactive" }.to_string(),
+            status: "active".to_string(),
             tags: shopify_product.tags.join(","),
+            store_id: store_uuid
         })
     }).collect()
 }

@@ -119,6 +119,8 @@ pub async fn create_account(
             domain VARCHAR(255),
             platform VARCHAR(50),
             sys_prompt TEXT,
+            shopify_storefront_access_token VARCHAR(255),
+            shopify_storefront_store_name VARCHAR(255),
             UNIQUE(store_name, store_table, domain)
         )
         "#

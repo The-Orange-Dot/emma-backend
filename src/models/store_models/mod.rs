@@ -22,7 +22,7 @@ pub struct Payload {
 }
 
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, Clone, Debug)]
 pub struct Store {
   pub id: Uuid,
   pub account_id: Uuid,
@@ -33,7 +33,7 @@ pub struct Store {
   pub domain: String,
   pub platform: String,
   pub sys_prompt: String,
-  // pub shopify_storefront_store_name: String,
-  // pub shopify_storefront_access_token: String
+  pub shopify_storefront_store_name: Option<String>,
+  pub shopify_storefront_access_token: Option<String>
   
 }

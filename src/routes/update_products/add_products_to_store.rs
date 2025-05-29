@@ -1,12 +1,14 @@
 use sqlx::{Pool, Postgres};
 use crate::models::products_models::Product;
 use chrono::{NaiveDateTime};
+use uuid::Uuid;
 
 pub async fn add_products_to_store(
   account_conn: Pool<Postgres>,
   products: Vec<Product>,
   table_name: String,
 ) -> Result<(), sqlx::error::Error> {
+  
   
   if !table_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
       return Err(sqlx::Error::Protocol("Invalid table name".into()));
@@ -26,13 +28,14 @@ pub async fn add_products_to_store(
   let updated_ats: Vec<NaiveDateTime> = products.iter().map(|p| p.updated_at.clone()).collect();
   let vendors: Vec<String> = products.iter().map(|p| p.vendor.clone()).collect();
   let created_ats: Vec<NaiveDateTime> = products.iter().map(|p| p.created_at.clone()).collect();
+  let store_ids: Vec<Uuid> = products.iter().map(|p| p.store_id.clone()).collect();
 
   let query_str = format!(
       r#"
-      INSERT INTO {} (
+      INSERT INTO {}_products (
           id, name, created_at, updated_at, price, vendor, 
           image, handle, description, seo_title, 
-          seo_description, category, status, tags
+          seo_description, category, status, tags, store_id
       )
       SELECT * FROM UNNEST(
           $1::integer[],
@@ -48,13 +51,15 @@ pub async fn add_products_to_store(
           $11::text[],
           $12::text[],
           $13::text[],
-          $14::text[]
-      )
+          $14::text[],
+          $15::Uuid[]
+      ) ON CONFLICT (id) DO NOTHING
       "#,
       table_name
   );
 
-  sqlx::query(&query_str)
+
+  let _products_added = sqlx::query(&query_str)
       .bind(&ids)
       .bind(&names)
       .bind(&created_ats)
@@ -69,12 +74,14 @@ pub async fn add_products_to_store(
       .bind(&categories)
       .bind(&statuses)
       .bind(&tags)
+      .bind(&store_ids)
       .execute(&account_conn)
       .await
       .map_err(|err| {
           eprintln!("Error adding products into store: {}", err);
           return sqlx::Error::Protocol("Failed to upload products".into())
       });
+
 
     Ok(())
 }

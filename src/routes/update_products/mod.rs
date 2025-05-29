@@ -5,9 +5,17 @@ use build_shopify_query::build_shopify_query;
 use serde::{Deserialize, Serialize};
 use actix_web::{web, put, Result, HttpResponse, Error};
 use serde_json;
-use crate::{helpers::{modify_types::string_to_uuid, target_pool::target_account_pool}, models::{
-  pools_models::AccountPools, products_models::shopify_products::ShopifyProductResponse, store_models::Store
-}};
+use crate::{
+  helpers::{
+    modify_types::string_to_uuid, 
+    target_pool::target_account_pool
+  }, 
+  models::{
+    pools_models::AccountPools, 
+    products_models::shopify_products::ShopifyProductResponse, 
+    store_models::Store
+  }
+};
 mod parse_shopify_products;
 use parse_shopify_products::parse_shopify_products;
 mod add_products_to_store;
@@ -52,50 +60,90 @@ pub async fn update_products(
 
   match store.platform.as_str() {
     "shopify" => {
-        let mut limit = 250;
-        let storefront_query: String = build_shopify_query(limit);
-        let client = reqwest::Client::new();
-
-
-        let response = client
-            .post(&format!("https://{}/api/unstable/graphql.json", shopify_storefront_store_name.unwrap_or("".to_string())))
-            .header("Content-Type", "application/json")
-            .header("X-Shopify-Storefront-Access-Token", shopify_storefront_access_token.unwrap_or("".to_string()))
-            .json(&serde_json::json!({
-                "query": storefront_query
-            }))
-            .send()
+        let _update_response = sqlx::query(
+            r#"
+                UPDATE stores 
+                SET shopify_storefront_store_name = $1,
+                shopify_storefront_access_token = $2
+                WHERE id = $3;
+            "#)
+            .bind(&shopify_storefront_store_name)
+            .bind(&shopify_storefront_access_token)
+            .bind(store_uuid)
+            .execute(&account_conn)
             .await
             .map_err(|err| {
-              eprintln!("Failed to read response text: {}", err);
-              actix_web::error::ErrorInternalServerError("Failed to read Shopify response")
-            })?;
+                println!("Error updating Shopify access token columns: {}", err)
+            });
 
-        let shopify_products: ShopifyProductResponse = response.json()
+
+        let mut limit: usize = 250;
+        let shopify_store_name = shopify_storefront_store_name.unwrap_or("".to_string());
+        let shopify_access_token = shopify_storefront_access_token.unwrap_or("".to_string());
+
+        loop {
+          let storefront_query: String = build_shopify_query(limit);
+          let client = reqwest::Client::new();
+              
+          let response = client
+              .post(&format!("https://{}/api/unstable/graphql.json", &shopify_store_name))
+              .header("Content-Type", "application/json")
+              .header("X-Shopify-Storefront-Access-Token", &shopify_access_token)
+              .json(&serde_json::json!({
+                  "query": storefront_query
+              }))
+              .send()
+              .await
+              .map_err(|err| {
+                eprintln!("Failed to read response text: {}", err);
+                actix_web::error::ErrorInternalServerError("Failed to read Shopify response")
+              })?;
+
+          let shopify_products: ShopifyProductResponse = response.json()
+              .await
+              .map_err(|e| {
+                  eprintln!("JSON parse error: {}", e);
+                  actix_web::error::ErrorInternalServerError("Failed to convert Shopify response to ShopifyProductResponse type")
+              })?;
+
+          println!("NUMBER OF PRODUCTS: {:?}", shopify_products.data.products.nodes.len());
+
+          let number_of_products = shopify_products.data.products.nodes.len();
+
+          let parsed_products = parse_shopify_products(shopify_products, store_uuid)
+              .map_err(|e| {
+                  eprintln!("JSON parse error: {}", e);
+                  actix_web::error::ErrorInternalServerError("Failed to parse Shopify response")
+              })?;
+
+          let _response = add_products_to_store(
+            account_conn.clone(), 
+            parsed_products.clone(), 
+            store.clone().store_table,
+          )
             .await
-            .map_err(|e| {
-                eprintln!("JSON parse error: {}", e);
-                actix_web::error::ErrorInternalServerError("Failed to convert Shopify response to ShopifyProductResponse type")
-            })?;
+            .map_err(|err| {
+              println!("Error adding products to '{:?}_products' table: {:?}", store.store_table, err)
+            });
 
-
-        let parsed_products = parse_shopify_products(shopify_products)
-            .map_err(|e| {
-                eprintln!("JSON parse error: {}", e);
-                actix_web::error::ErrorInternalServerError("Failed to parse Shopify response")
-            })?;
-
-        let _response = add_products_to_store(account_conn.clone(), parsed_products.clone(), store.store_table);
+            if number_of_products < 250 {
+                println!("{:?}", "No more products to fetch. Ending API fetching loop.");
+                break;
+            } else {
+                println!("{:?}", "Over 250 products fetched, continuing to fetch products.");
+                limit += 250;  
+            }
+        }
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
           "status": "success",
           "message": "Successfully updated products",
-          "response": parsed_products
+          "response": []
         })))
     }
     _ => {
         // Handle unknown platforms
-        println!("Unknown platform: {}", store.platform);
+        println!("Unknown platform: {:?}", store.platform);
         Err(
           actix_web::error::ErrorInternalServerError("Error")
         )
