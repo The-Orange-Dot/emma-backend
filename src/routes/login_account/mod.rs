@@ -1,5 +1,4 @@
 use actix_web::{
-  Error, 
   HttpResponse, 
   web, 
   post, 
@@ -23,7 +22,7 @@ struct LoginPayload {
 pub async fn login_account(
     payload: web::Json<LoginPayload>,
     admin_pool: web::Data<AdminPool>,
-) -> Result<HttpResponse, Error> {
+) -> HttpResponse {
     let req = payload.into_inner();
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
@@ -37,15 +36,25 @@ pub async fn login_account(
     .fetch_one(&admin_conn)
     .await
     .map_err(|err| {
-        eprintln!("Database error: {}", err);
-        actix_web::error::ErrorUnauthorized("Invalid email or password")
-    })?;
+        eprintln!("Failed to find existing user: {}", err);
+        HttpResponse::Unauthorized().json(serde_json::json!({
+          "status": "unauthorized",
+          "message": "Invalid email or password",
+          "response": []
+        }))
+    }).unwrap();
+
+    println!("DEBUG: {:?}", found_account);
 
     let stored_hash = PasswordHash::new(&found_account.password)
         .map_err(|err| {
             eprintln!("Failed to parse stored hash: {}", err);
-            actix_web::error::ErrorInternalServerError(format!("Internal server error: {}", err))
-        })?;
+            HttpResponse::Unauthorized().json(serde_json::json!({
+              "status": "unauthorized",
+              "message": "Invalid email or password",
+              "response": []
+            }))
+        }).unwrap();
 
     let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
 
@@ -69,7 +78,7 @@ pub async fn login_account(
             let token = auth::create_jwt(&found_account.id.to_string())
                 .expect("failed to create JWT token");
 
-            Ok(HttpResponse::Ok()
+            HttpResponse::Ok()
                 .cookie(
                     Cookie::build("jwt", &token)
                         .http_only(true)
@@ -85,7 +94,7 @@ pub async fn login_account(
                   "token": token,
                   "response": {"user": account_res}
               
-            })))
+            }))
         }
         Err(err) => {
             let (status_code, error_message) = match err {
@@ -98,11 +107,11 @@ pub async fn login_account(
                 }
             };
 
-            Ok(HttpResponse::build(status_code).json(serde_json::json!({
+            HttpResponse::build(status_code).json(serde_json::json!({
               "status": status_code.as_str().to_lowercase(),
               "message": error_message,
               "response": []
-            })))
+            }))
         }
     }
 }

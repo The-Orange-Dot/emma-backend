@@ -12,6 +12,7 @@ pub async fn create_accounts_table(admin_pool: Pool<Postgres>) {
                 status VARCHAR(50) DEFAULT 'inactive',
                 plan VARCHAR(50),
                 credits INT DEFAULT 0,
+                role VARCHAR(50) DEFAULT 'user',
                 password VARCHAR(255) NOT NULL,
                 db_password VARCHAR(255) NOT NULL,
                 subscription_ends TIMESTAMPTZ NOT NULL DEFAULT NOW(),

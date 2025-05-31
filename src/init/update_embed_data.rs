@@ -1,17 +1,8 @@
-use sqlx::Postgres;
-use tokio::task;
-use backoff::{ExponentialBackoff, future::retry};
-use tokio::time::{Duration, Instant};
-use std::panic;
+use sqlx::{Postgres, postgres::PgQueryResult};
 use chrono::Utc;
 
-pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_name: String) -> tokio::task::JoinHandle<()> {
-    task::spawn(async move {
-        // Add panic hook to catch any silent failures
-        panic::set_hook(Box::new(|panic_info| {
-            eprintln!("Task panicked: {:?}", panic_info);
-        }));
-
+pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, store_name: String) -> Result<PgQueryResult, sqlx::Error> {
+        
         let query = format!(
             "
                 WITH target_products AS (
@@ -49,55 +40,11 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, timer: u64, store_nam
             store_name
         );
 
-        let operation = || async {
             let current_time = Utc::now().naive_utc();
             let result = sqlx::query(&query)
             .bind(current_time)
             .execute(&pool)
             .await;
 
-            match result {
-                Ok(res) => {
-                    println!("Embedder now checking products on {} ", store_name);
-                    Ok(res)
-                },
-                Err(e) => {
-                    // println!("[DEBUG] Update error: {:?}", e);
-                    println!("Cannot find table {}", store_name);
-                    Err(backoff::Error::transient(e))
-                }
-            }
-        };
-        
-        let backoff = ExponentialBackoff {
-            initial_interval: Duration::from_secs(2),
-            multiplier: 2.0,                          
-            max_interval: Duration::from_secs(15),    
-            max_elapsed_time: Some(Duration::from_secs(7)),
-            ..ExponentialBackoff::default()
-        };
-
-        loop {
-            let start = Instant::now();
-
-            match retry(backoff.clone(), operation).await {
-                Ok(result) => {
-                    let rows = result.rows_affected();
-                    if rows != 0 {
-                      println!("[SUCCESS] Processed {} rows in {:?}", rows, start.elapsed());
-                    }
-                    
-                    if rows == 0 {
-                        // println!("[SLEEP] No rows to process, sleeping...");
-                        tokio::time::sleep(Duration::from_secs(timer)).await;
-                    }
-                }
-                Err(e) => {
-                    println!("[FATAL ERROR] {:?}", e);
-                    println!("Disconnecting embedder for {}", store_name);
-                    break;
-                }
-            }
-        }
-    })
+            result
 }

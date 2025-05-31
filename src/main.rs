@@ -75,6 +75,7 @@ async fn main() -> Result<(), Error> {
         .service(routes::delete_store::delete_store) // DELETE
         .service(routes::login_account::login_account) // POST
         .service(routes::update_products::update_products) // PUT
+        .service(routes::logout_account::logout_account) // POST
         .service(routes::me::me) // GET
     })     
         .bind(("127.0.0.1", 8080))?

@@ -1,7 +1,7 @@
-use actix_web::{put, web, Result, HttpResponse, Error};
+use actix_web::{put, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::{helpers::target_pool::{target_account_pool}, models::pools_models::AccountPools};
+use crate::{auth::token_to_user_id::token_to_string_id, helpers::target_pool::target_account_pool, models::pools_models::AccountPools};
 
 #[derive(Serialize, Deserialize)]
 struct ReqPayload {
@@ -9,50 +9,70 @@ struct ReqPayload {
     sys_prompt: String
 }
 
-#[put("/stores/llm/{account_id}")]
+#[put("/stores/emma")]
 pub async fn update_store_sys_prompt(
     account_pools: web::Data<AccountPools>,
-    account_id: web::Path<String>,  
-    payload: web::Json<ReqPayload> 
-) ->  Result<HttpResponse, Error>{
-  let req = payload.into_inner();
-  let new_system_prompt = req.sys_prompt;
-  let store_id = req.store_id;
-  let account_id = account_id.into_inner();
+    payload: web::Json<ReqPayload>,
+    req: HttpRequest
+) ->  HttpResponse{
 
-  let account_conn = target_account_pool(account_id, account_pools);
+  let account_id = token_to_string_id(req);
 
-  let result = sqlx::query(
-      r#"
-          UPDATE stores 
-          SET sys_prompt = $1 
-          WHERE ID = $2
-      "#
-  )
-    .bind(new_system_prompt)
-    .bind(store_id)
-    .execute(&account_conn)
-    .await
-    .map_err(|err| {
-        HttpResponse::InternalServerError().json(serde_json::json!({
-          "status": "error",
-          "message": format!("Internal server error: {}", err),
-          "response": []
-        }));
-        actix_web::error::ErrorInternalServerError(format!("Error updating store system prompt: {}.", err))
-    })?;
+  match account_id {
+    Ok(id) => {
+        let ReqPayload {store_id, sys_prompt}  = payload.into_inner();
+        let account_conn: sqlx::Pool<sqlx::Postgres> = target_account_pool(id, account_pools);
 
-  if result.rows_affected() == 0 {
-      return Ok(HttpResponse::NotFound().json(serde_json::json!({
-          "status": "error",
-          "message": format!("No store found with ID {}", store_id),
-          "response": []
-      })));
+        let result = sqlx::query(
+            r#"
+                UPDATE stores 
+                SET sys_prompt = $1 
+                WHERE ID = $2
+            "#
+        )
+          .bind(sys_prompt)
+          .bind(store_id)
+          .execute(&account_conn)
+          .await
+          .map_err(|err| {
+              eprintln!("Failed to update store: {}", err);
+              HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": format!("Failed to update store: {}", err),
+                "response": []
+              }));
+          }).unwrap();    
+
+          if result.rows_affected() == 0 {
+              eprintln!("No stores found");
+              return HttpResponse::NotFound().json(serde_json::json!({
+                  "status": "error",
+                  "message": format!("No store found with ID {}", store_id),
+                  "response": []
+              }));
+          }              
+
+          HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "System Prompt for store has been updated",
+            "response": []
+          }))
+    }
+
+    Err(err) => {
+      eprintln!("Error fetching user: {:?}", err);
+      return HttpResponse::Unauthorized().json(serde_json::json!({
+        "status": "unauthorized",
+        "message": "Token not found or valid",
+        "response": []
+      }))
+    }
   }
 
-  Ok(HttpResponse::Ok().json(serde_json::json!({
-    "status": "success",
-    "message": "System Prompt for store has been updated",
-    "response": []
-  })))
+
+
+
+
+
+
 }

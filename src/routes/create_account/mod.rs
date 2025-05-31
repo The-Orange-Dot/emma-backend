@@ -107,7 +107,7 @@ pub async fn create_account(
     let _ = install_extensions(&admin_url, &snake_case_name)
         .await;
 
-    let new_store_table_if_not_created = sqlx::query(
+    let _new_store_table_if_not_created = sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS stores (
             id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -119,10 +119,23 @@ pub async fn create_account(
             domain VARCHAR(255),
             platform VARCHAR(50),
             sys_prompt TEXT,
+            image BYTEA,
             shopify_storefront_access_token VARCHAR(255),
             shopify_storefront_store_name VARCHAR(255),
             UNIQUE(store_name, store_table, domain)
         )
+        "#
+    )
+    .execute(&account_conn)
+    .await;
+
+    let new_store_table_if_not_created = sqlx::query(
+        r#"
+            CREATE TABLE IF NOT EXISTS store_products (
+                store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+                products_table_name VARCHAR(255) NOT NULL,
+                PRIMARY KEY (store_id, products_table_name)
+            );
         "#
     )
     .execute(&account_conn)
