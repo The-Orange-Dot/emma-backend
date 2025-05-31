@@ -1,23 +1,16 @@
 use actix_web::{ HttpServer, Error, Result, App, web };
 mod routes;
 mod models;
+mod middleware;
 use helpers::init_all_account_connections::init_all_account_connections;
 use sqlx::{postgres::PgPoolOptions};
 mod init;
 use init::{preload_model::preload_model, init_pgai, create_accounts_table::create_accounts_table};
 use std::time::Duration;
-use routes::{generate_gemma::generate_gemma, 
-    create_account::create_account, 
-    create_store::create_store,
-    update_store_sys_prompt::update_store_sys_prompt,
-    get_stores::get_stores,
-    delete_store::delete_store,
-    login_account::login_account,
-    update_products::update_products
-};
 use actix_cors::Cors;
 mod helpers;
 use models::pools_models::{AdminPool};
+mod auth;
 
 #[actix_web::main]
 async fn main() -> Result<(), Error> {
@@ -56,8 +49,12 @@ async fn main() -> Result<(), Error> {
         .wrap(
             Cors::default()
             // Eventually add CORS
-            // .allowed_origin("http://your-nextjs-app.com")
+            .allowed_origin("http://100.74.191.99:3000")
+            .allowed_origin("http://localhost:3000")
             .allowed_methods(["POST", "DELETE", "GET", "PUT"])
+            .allow_any_header()
+            .supports_credentials()
+
         )
         .app_data(
             web::PayloadConfig::default()
@@ -70,14 +67,15 @@ async fn main() -> Result<(), Error> {
         .app_data(web::Data::new(account_pools.clone()))
         .app_data(web::Data::new(AdminPool(admin_pool.clone())))
         .app_data(web::Data::new(admin_url.clone()))
-        .service(generate_gemma) // POST
-        .service(create_account) // POST
-        .service(create_store) // POST
-        .service(update_store_sys_prompt) // PUT
-        .service(get_stores) // GET
-        .service(delete_store) // DELETE
-        .service(login_account) // POST
-        .service(update_products) // PUT
+        .service(routes::generate_gemma::generate_gemma) // POST
+        .service(routes::create_account::create_account) // POST
+        .service(routes::create_store::create_store) // POST
+        .service(routes::update_store_sys_prompt::update_store_sys_prompt) // PUT
+        .service(routes::get_stores::get_stores) // GET
+        .service(routes::delete_store::delete_store) // DELETE
+        .service(routes::login_account::login_account) // POST
+        .service(routes::update_products::update_products) // PUT
+        .service(routes::me::me) // GET
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

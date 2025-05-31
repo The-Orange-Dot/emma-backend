@@ -25,6 +25,7 @@ pub async fn preload_model (pool: Pool<Postgres>) -> Result<(), Error> {
     }
     Err(err) => {
         eprint!("'{}' could not be preloaded: {}", model, err);
+        println!("");
         actix_web::error::ErrorInternalServerError(format!("Failed to preload model: {}", err ));
     }
   }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow};
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::{NaiveDateTime};
 use uuid::Uuid;
 
 pub mod shopify_products;

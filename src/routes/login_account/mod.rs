@@ -1,10 +1,17 @@
-use actix_web::{Error, HttpResponse, web, post};
+use actix_web::{
+  Error, 
+  HttpResponse, 
+  web, 
+  post, 
+  cookie::{Cookie, time::Duration, SameSite}
+};
 use serde::{Deserialize, Serialize};
 use crate::{
     helpers::target_pool::target_admin_pool, 
     models::{account_models::Account, pools_models::AdminPool}
 };
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use crate::auth;
 
 #[derive(Deserialize, Serialize)]
 struct LoginPayload {
@@ -40,29 +47,62 @@ pub async fn login_account(
             actix_web::error::ErrorInternalServerError(format!("Internal server error: {}", err))
         })?;
 
-    Argon2::default().verify_password(input_password.as_bytes(), &stored_hash)
-        .map_err(|err| {
-            eprintln!("Failed to verify password: {}", err);
-            actix_web::error::ErrorUnauthorized("Invalid email or password")
-        })?;
+    let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
 
-    let account_res = serde_json::json!({
-      "created_at": found_account.created_at,
-      "credits": found_account.credits,
-      "email": found_account.email,
-      "first_name": found_account.first_name,
-      "id": found_account.id,
-      "last_login_at": found_account.last_login_at,
-      "plan": found_account.plan,
-      "status": found_account.status,
-      "subscription_ends": found_account.subscription_ends,
-      "updated_at": found_account.updated_at,
-      "username": found_account.username
-    });
+    match password_verification {
+        Ok(_) => {
+            let account_res = serde_json::json!({
+              "created_at": found_account.created_at,
+              "credits": found_account.credits,
+              "email": found_account.email,
+              "first_name": found_account.first_name,
+              "id": found_account.id,
+              "last_login_at": found_account.last_login_at,
+              "plan": found_account.plan,
+              "role": found_account.role,
+              "status": found_account.status,
+              "subscription_ends": found_account.subscription_ends,
+              "updated_at": found_account.updated_at,
+              "username": found_account.username
+            });
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "status": "success",
-        "message": "Successfully logged in!",
-        "account": account_res,
-    })))
+            let token = auth::create_jwt(&found_account.id.to_string())
+                .expect("failed to create JWT token");
+
+            Ok(HttpResponse::Ok()
+                .cookie(
+                    Cookie::build("jwt", &token)
+                        .http_only(true)
+                        // .secure(true)
+                        .same_site(SameSite::Lax)
+                        .path("/")
+                        .max_age(Duration::days(30))
+                        .finish()
+                )
+                .json(serde_json::json!({
+                  "status": "success",
+                  "message": "Successfully logged in!",
+                  "token": token,
+                  "response": {"user": account_res}
+              
+            })))
+        }
+        Err(err) => {
+            let (status_code, error_message) = match err {
+                argon2::password_hash::Error::Password => {
+                    (actix_web::http::StatusCode::UNAUTHORIZED, "Invalid password or email address.")
+                }
+                _ => {
+                    eprintln!("Password verification error: {}", err);
+                    (actix_web::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal server error during authentication.")
+                }
+            };
+
+            Ok(HttpResponse::build(status_code).json(serde_json::json!({
+              "status": status_code.as_str().to_lowercase(),
+              "message": error_message,
+              "response": []
+            })))
+        }
+    }
 }

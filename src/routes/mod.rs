@@ -6,3 +6,4 @@ pub mod get_stores;
 pub mod delete_store;
 pub mod login_account;
 pub mod update_products;
+pub mod me;

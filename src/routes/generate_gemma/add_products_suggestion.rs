@@ -53,7 +53,7 @@ pub async fn add_products_suggestion(
             'Include the products as a list at the end of the response each have to be in their own square brackets with no commas between them [Like] [This].\n\n' ||
             'User query: ' || $1 || '\n\n' ||
             'Relevant products: ' || (SELECT context_chunk FROM context_agg),
-            system_prompt => 'Your job is to look at the image given to you and answer any questions that are asked. You must NEVER give medical advice to the clients. {}',
+            system_prompt => 'Your job is to look at the image given to you and answer any questions that are asked. You must NEVER give medical or legal advice to the clients. {}',
             images => {}
         )->>'response' as response
         "#,
