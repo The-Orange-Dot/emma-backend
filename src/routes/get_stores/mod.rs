@@ -12,13 +12,16 @@ pub async fn get_stores(
 ) -> HttpResponse{
   let id_string = token_to_string_id(req);
 
+
   match id_string {
     Ok(id) => {
 
+
       let account_conn = target_account_pool(id, account_pools);
 
+
         let stores = sqlx::query_as::<_, Store>("
-              SELECT id, created_at, 
+              SELECT id, created_at, account_id,
               updated_at, store_name, 
               store_table, domain, 
               platform, sys_prompt, 
@@ -29,13 +32,15 @@ pub async fn get_stores(
             ")
             .fetch_all(&account_conn)
             .await
-            .map_err(|_err| {
+            .map_err(|err| {
+                println!("Error fetching stores: {}", err);
                 HttpResponse::NotFound().json(serde_json::json!({
                   "status": "not-found",
                   "message": "Stores not found.",
                   "response": []
                 }))
             }).unwrap();
+
 
         let stores_res = if stores.len() != 0 {stores} else {Vec::new()};
 
