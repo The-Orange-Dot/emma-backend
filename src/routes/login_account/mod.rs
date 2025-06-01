@@ -44,8 +44,6 @@ pub async fn login_account(
         }))
     }).unwrap();
 
-    println!("DEBUG: {:?}", found_account);
-
     let stored_hash = PasswordHash::new(&found_account.password)
         .map_err(|err| {
             eprintln!("Failed to parse stored hash: {}", err);
