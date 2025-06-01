@@ -27,7 +27,7 @@ pub async fn login_account(
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
 
-    eprintln!("Attempting login with email: '{}'", &req.email);
+    // eprintln!("Attempting login with email: '{}'", &req.email);
 
     let found_account = sqlx::query_as::<_, Account>(
         "SELECT * FROM accounts WHERE LOWER(email) = LOWER($1)"

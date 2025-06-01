@@ -111,8 +111,6 @@ pub async fn create_store(
             .execute(&account_conn)
             .await;
 
-          println!("==== DEBUG ====: {:?}", add_table_to_product_store);
-
           match new_products_table {
             Ok(_) => {
                 attach_embed_data_checker(account_conn.clone(), 60 * 60 * 12, store_table_name.clone())
