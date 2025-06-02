@@ -33,11 +33,9 @@ async fn main() -> Result<(), Error> {
         .await?;
 
 
-    for (_account_id, pool) in &account_pools.0 {
-        // println!("Adding embedder into {}", account_id);
+    for (_account_id, pool) in account_pools.0.read().unwrap().iter() {
         init_pgai(pool.clone()).await?;
-    }
-
+}
     let _preloads_model = preload_model(admin_pool.clone())
         .await
         .expect("Could ne establish connection to LLM Server");
@@ -77,6 +75,8 @@ async fn main() -> Result<(), Error> {
         .service(routes::update_products::update_products) // PUT
         .service(routes::logout_account::logout_account) // POST
         .service(routes::me::me) // GET
+        .service(routes::get_store_products::get_store_products) // GET
+        .service(routes::generation_demo::generation_demo) // POST
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

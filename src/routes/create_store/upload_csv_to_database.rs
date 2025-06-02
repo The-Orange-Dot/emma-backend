@@ -1,8 +1,8 @@
 use sqlx::{Pool, Postgres};
-use chrono::{NaiveDateTime};
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use sqlx::types::chrono::Utc;
 use serde::{Serialize, Deserialize};
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CSVValue {
@@ -14,7 +14,7 @@ category: String,
 tags: String,
 image: String,
 status: String,
-price: f64,
+price: Decimal,
 seo_title: String,
 seo_description: String
 }
@@ -37,7 +37,7 @@ pub async fn upload_csv_to_database(
       return Err(sqlx::Error::Protocol("Invalid table name".into()));
   }
 
-  let current_time = Utc::now().naive_utc();
+  let current_time = Utc::now();
 
   let ids: Vec<i32> = products.iter().map(|p| p.index as i32).collect();
   let names: Vec<String> = products.iter().map(|p| p.values.name.clone()).collect();
@@ -45,14 +45,14 @@ pub async fn upload_csv_to_database(
   let descriptions: Vec<String> = products.iter().map(|p| p.values.description.clone()).collect();
   let handles: Vec<String> = products.iter().map(|p| p.values.handle.clone()).collect();
   let images: Vec<String> = products.iter().map(|p| p.values.image.clone()).collect();
-  let prices: Vec<f64> = products.iter().map(|p| p.values.price.clone()).collect();
+  let prices: Vec<f64> = products.iter().map(|p| p.values.price.clone().to_f64().unwrap()).collect();
   let seo_descriptions: Vec<String> = products.iter().map(|p| p.values.seo_description.clone()).collect();
   let seo_titles: Vec<String> = products.iter().map(|p| p.values.seo_title.clone()).collect();
   let statuses: Vec<String> = products.iter().map(|p| p.values.status.clone()).collect();
   let tags: Vec<String> = products.iter().map(|p| p.values.tags.clone()).collect();
-  let updated_ats: Vec<NaiveDateTime> = products.iter().map(|_| current_time).clone().collect();
+  let updated_ats: Vec<DateTime<Utc>> = products.iter().map(|_| current_time).clone().collect();
   let vendors: Vec<String> = products.iter().map(|p| p.values.vendor.clone()).collect();
-  let created_ats: Vec<NaiveDateTime> = products.iter().map(|_| current_time.clone()).collect();
+  let created_ats: Vec<DateTime<Utc>> = products.iter().map(|_| current_time.clone()).collect();
   let store_ids: Vec<Uuid> = products.iter().map(|_| store_id.clone()).collect();
 
   let query_str = format!(

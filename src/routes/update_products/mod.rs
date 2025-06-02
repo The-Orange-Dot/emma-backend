@@ -44,7 +44,7 @@ pub async fn update_products(
 
   match user_id {
     Ok(id) => {
-        let account_conn = target_account_pool(id.clone(), account_pools);
+        let account_conn = target_account_pool(id.clone(), account_pools).unwrap();
         let store_uuid = string_to_uuid(store_id);
 
         let store_res = sqlx::query_as::<_, Store>(
@@ -100,7 +100,7 @@ pub async fn update_products(
                           .map_err(|err| {
                             eprintln!("Failed to read response text: {}", err);
                             return HttpResponse::NotFound().json(serde_json::json!({
-                              "status": "not-found",
+                              "status": 404,
                               "message": "Failed to fetch products from Shopify API",
                               "response": []
                             }))                     
@@ -111,7 +111,7 @@ pub async fn update_products(
                           .map_err(|e| {
                               eprintln!("JSON parse error: {}", e);
                               return HttpResponse::InternalServerError().json(serde_json::json!({
-                                "status": "error",
+                                "status": 500,
                                 "message": "Failed to unpack products from Shopify",
                                 "response": []
                               }))
@@ -123,7 +123,7 @@ pub async fn update_products(
                           .map_err(|e| {
                               eprintln!("JSON parse error: {}", e);
                               return HttpResponse::InternalServerError().json(serde_json::json!({
-                                "status": "error",
+                                "status": 500,
                                 "message": "Failed to parse products from Shopify",
                                 "response": []
                               }))
@@ -165,7 +165,7 @@ pub async fn update_products(
                     }
 
                     HttpResponse::Ok().json(serde_json::json!({
-                      "status": "success",
+                      "status": 200,
                       "message": format!("Successfully updated and vectorized {} products", counter),
                       "response": []
                     }))
@@ -174,7 +174,7 @@ pub async fn update_products(
                     // Handles unknown platforms
                     println!("Unknown platform: {:?}", store.platform);
                         return HttpResponse::NotFound().json(serde_json::json!({
-                          "status": "not-found",
+                          "status": 404,
                           "message": "Platform not found",
                           "response": []
                     }))
@@ -186,7 +186,7 @@ pub async fn update_products(
           Err(err) => {
             eprintln!("Error fetching user: {:?}", err);
             return HttpResponse::NotFound().json(serde_json::json!({
-              "status": "error",
+              "status": 500,
               "message": "No store exists",
               "response": []
             }))
@@ -197,7 +197,7 @@ pub async fn update_products(
     Err(err) => {
       eprintln!("Error fetching user: {:?}", err);
       return HttpResponse::Unauthorized().json(serde_json::json!({
-        "status": "unauthorized",
+        "status": 401,
         "message": "Token not found or valid",
         "response": []
       }))

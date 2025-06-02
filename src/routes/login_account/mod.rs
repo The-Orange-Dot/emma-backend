@@ -38,7 +38,7 @@ pub async fn login_account(
     .map_err(|err| {
         eprintln!("Failed to find existing user: {}", err);
         HttpResponse::Unauthorized().json(serde_json::json!({
-          "status": "unauthorized",
+          "status": 401,
           "message": "Invalid email or password",
           "response": []
         }))
@@ -48,7 +48,7 @@ pub async fn login_account(
         .map_err(|err| {
             eprintln!("Failed to parse stored hash: {}", err);
             HttpResponse::Unauthorized().json(serde_json::json!({
-              "status": "unauthorized",
+              "status": 401,
               "message": "Invalid email or password",
               "response": []
             }))
@@ -87,7 +87,7 @@ pub async fn login_account(
                         .finish()
                 )
                 .json(serde_json::json!({
-                  "status": "success",
+                  "status": 200,
                   "message": "Successfully logged in!",
                   "token": token,
                   "response": {"user": account_res}

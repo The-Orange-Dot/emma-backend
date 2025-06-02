@@ -40,7 +40,7 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, store_name: String) -
             store_name
         );
 
-            let current_time = Utc::now().naive_utc();
+            let current_time = Utc::now();
             let result = sqlx::query(&query)
             .bind(current_time)
             .execute(&pool)

@@ -12,13 +12,15 @@ fn logout() -> HttpResponse {
                 .finish()
         )
         .json(serde_json::json!({
-            "status": "unauthorized", 
+            "status": 401, 
             "message": "Missing token, flushing cookies",
             "response": []
         }))
 }
 
 pub fn token_to_uuid(req: HttpRequest) -> Result<Uuid, HttpResponse> {
+
+    
 
    let auth_header = req.headers().get("Authorization")
         .and_then(|h| h.to_str().ok());
@@ -42,6 +44,7 @@ pub fn token_to_string_id(req: HttpRequest) -> Result<String, HttpResponse> {
 
    let auth_header = req.headers().get("Authorization")
         .and_then(|h| h.to_str().ok());
+
     
     let token = match auth_header {
         Some(header) if header.starts_with("Bearer ") => &header[7..],

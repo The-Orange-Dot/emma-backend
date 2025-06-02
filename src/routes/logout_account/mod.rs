@@ -10,7 +10,7 @@ pub async fn logout_account() -> impl Responder {
                 .finish()
         )
         .json(serde_json::json!({
-            "status": "success", 
+            "status": 200, 
             "message": "User has logged out",
             "response": []
         }))

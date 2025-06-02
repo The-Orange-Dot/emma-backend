@@ -15,9 +15,7 @@ pub async fn get_stores(
 
   match id_string {
     Ok(id) => {
-
-
-      let account_conn = target_account_pool(id, account_pools);
+      let account_conn = target_account_pool(id, account_pools).unwrap();
 
 
         let stores = sqlx::query_as::<_, Store>("
@@ -35,7 +33,7 @@ pub async fn get_stores(
             .map_err(|err| {
                 println!("Error fetching stores: {}", err);
                 HttpResponse::NotFound().json(serde_json::json!({
-                  "status": "not-found",
+                  "status": 404,
                   "message": "Stores not found.",
                   "response": []
                 }))
@@ -46,7 +44,7 @@ pub async fn get_stores(
 
         HttpResponse::Ok()
         .json(serde_json::json!({
-          "status": "success",
+          "status": 200,
           "message": "Successfully fetched stores",
           "response": stores_res
         }))
@@ -55,7 +53,7 @@ pub async fn get_stores(
     Err(err) => {
         eprintln!("Error fetching stores: {:?}", err);
         HttpResponse::Unauthorized().json(serde_json::json!({
-        "status": "unauthorized",
+        "status": 401,
         "message": "Invalid or missing token",
         "response": []
       }))

@@ -1,11 +1,12 @@
 use crate::models::products_models::{Product, shopify_products::ShopifyProductResponse};
-use chrono::{DateTime, NaiveDateTime};
-use chrono::format::ParseError;
+use chrono::{DateTime, Utc};
+use bigdecimal::BigDecimal;
 use uuid::Uuid;
+use chrono::format::ParseResult;
 
-fn parse_shopify_datetime(dt_str: &str) -> Result<NaiveDateTime, ParseError> {
+fn parse_shopify_datetime(dt_str: &str) -> ParseResult<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(dt_str)
-        .map(|dt| dt.naive_utc())
+        .map(|dt| dt.with_timezone(&Utc))
 }
 
 pub fn parse_shopify_products(response: ShopifyProductResponse, store_uuid: Uuid) -> Result<Vec<Product>, String> {
@@ -23,7 +24,7 @@ pub fn parse_shopify_products(response: ShopifyProductResponse, store_uuid: Uuid
 
         let price = shopify_product.price_range.min_variant_price.amount
             .as_str()
-            .parse::<f64>()
+            .parse::<BigDecimal>()
             .map_err(|_| format!("Invalid price format: {}", shopify_product.price_range.min_variant_price.amount))?;
 
         // Handle featured image - more robust version

@@ -25,7 +25,7 @@ pub async fn delete_store(
   
   match account_id {
     Ok(id) => {
-        let account_conn = target_account_pool(id.clone(), account_pools);
+        let account_conn = target_account_pool(id.clone(), account_pools).unwrap();
         let store_table = format!("{}_products", store_table);
         let query = format!("DROP TABLE IF EXISTS {}", store_table);
 
@@ -40,7 +40,7 @@ pub async fn delete_store(
 
           Err(err) => {
             HttpResponse::InternalServerError().json(serde_json::json!({
-              "status": "error",
+              "status": 500,
               "message": format!("Internal Server Error while dropping {} products table: {}", store_table, err),
               "response": []
             }));
@@ -69,7 +69,7 @@ pub async fn delete_store(
         }
 
         Ok(HttpResponse::Ok().json(serde_json::json!({
-          "status": "success",
+          "status": 200,
           "message": "Store has been deleted.",
           "response": []
         })))
@@ -78,7 +78,7 @@ pub async fn delete_store(
     Err(err) => {
         eprintln!("Error fetching stores: {:?}", err);
         Ok(HttpResponse::Unauthorized().json(serde_json::json!({
-        "status": "unauthorized",
+        "status": 401,
         "message": "Invalid or missing token",
         "response": []
       })))

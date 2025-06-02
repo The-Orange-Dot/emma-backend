@@ -28,7 +28,7 @@ pub async fn me(
           match res {
             Ok(account) => {
               HttpResponse::Ok().json(serde_json::json!({
-                "status": "success",
+                "status": 200,
                 "message": "User authenticated",
                 "response": {
                     "created_at": account.created_at,
@@ -50,7 +50,7 @@ pub async fn me(
             Err(err) => {
               eprintln!("Error fetching user: {:?}", err);
               HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "unauthorized",
+                "status": 401,
                 "message": "Not authenticated",
                 "response": []
               }))
@@ -60,7 +60,7 @@ pub async fn me(
       Err(err) => {
         eprintln!("Error fetching user: {:?}", err);
         return HttpResponse::Unauthorized().json(serde_json::json!({
-          "status": "unauthorized",
+          "status": 401,
           "message": "Token not found or valid",
           "response": []
         }))

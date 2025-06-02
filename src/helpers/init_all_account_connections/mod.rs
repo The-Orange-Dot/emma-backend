@@ -4,6 +4,7 @@ use super::get_account_psql_link::get_account_psql_link;
 use crate::models::pools_models::AccountPools;
 use std::collections::HashMap;
 use crate::helpers::install_extensions::install_extensions;
+use std::sync::{Arc, RwLock};
 
 #[derive(FromRow)]
 struct AccountRes {
@@ -25,7 +26,8 @@ pub async fn init_all_account_connections(
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-    let mut account_pools = HashMap::new();
+    let account_pools = HashMap::new();
+    let account_pools = Arc::new(RwLock::new(account_pools));
     
     for account in accounts {
         let postgres_url = std::env::var("POSTGRES_URL")
@@ -48,7 +50,10 @@ pub async fn init_all_account_connections(
 
         println!("Connected to {} account pool", account.username);
 
-        account_pools.insert(account.id, account_pool);
+        // Acquire write lock and insert the new pool
+        account_pools.write()
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to acquire write lock"))?
+            .insert(account.id, account_pool);
     }
     
     Ok(AccountPools(account_pools))

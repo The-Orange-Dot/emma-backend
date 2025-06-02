@@ -1,17 +1,18 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow};
-use chrono::{NaiveDateTime};
+use bigdecimal::BigDecimal;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
 
 pub mod shopify_products;
 
 #[derive(Deserialize, Serialize, FromRow, Debug, Clone)]
 pub struct Product {
   pub id: i64,
-  pub created_at: NaiveDateTime,
-  pub updated_at: NaiveDateTime,
+  pub created_at: DateTime<Utc>,
+  pub updated_at: DateTime<Utc>,
   pub name: String,
-  pub price: f64,
+  pub price: BigDecimal,
   pub vendor: String,
   pub image: String,
   pub handle: String,

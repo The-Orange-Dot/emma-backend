@@ -8,3 +8,5 @@ pub mod login_account;
 pub mod update_products;
 pub mod me;
 pub mod logout_account;
+pub mod get_store_products;
+pub mod generation_demo;

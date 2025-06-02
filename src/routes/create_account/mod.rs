@@ -2,23 +2,23 @@ use actix_web::{web, HttpResponse, post};
 use sqlx::{postgres::{PgPoolOptions}, Postgres, Transaction};
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString};
-use rand_core::OsRng;
+use argon2::password_hash::rand_core::{OsRng};
 use std::error::Error;
 use crate::{
     models::account_models::Payload,
+    models::pools_models::AccountPools
 };
 use crate::helpers::{
     generate_random_password::generate_random_password, 
     to_snake_case::to_snake_case,
-    get_account_psql_link::get_account_psql_link,
     target_pool::target_admin_pool,
-    install_extensions::install_extensions
+    add_account_to_pools::add_account_to_pools
 };
 use password_encoder::{encrypt_password, get_or_create_dev_key};
 
 mod ensure_store_auth_table;
 use ensure_store_auth_table::ensure_store_auth_table;
-
+use uuid::Uuid;
 use crate::models::pools_models::{AdminPool};
 
 #[post("/signup")]
@@ -26,6 +26,7 @@ pub async fn create_account(
     admin_pool: web::Data<AdminPool>,
     admin_url: web::Data<String>,
     payload: web::Json<Payload>,
+    account_pools: web::Data<AccountPools>,
 ) -> Result<HttpResponse, Box<dyn Error>> {
     let req = payload.into_inner();
     let admin_conn = target_admin_pool(admin_pool);
@@ -37,7 +38,6 @@ pub async fn create_account(
 
     let snake_case_name = to_snake_case(&req.username);
     let db_username = format!("{}", snake_case_name);
-    let dashboard_username = format!("user_{}", snake_case_name);
     
     let db_password = generate_random_password(24);
     let dashboard_password = req.password;
@@ -96,16 +96,36 @@ pub async fn create_account(
     .await?;
 
     transaction.commit().await?;
+
+    let account_id = sqlx::query_as::<_, (Uuid,)>(
+        "SELECT id FROM accounts WHERE username = $1"
+    )
+    .bind(&snake_case_name)
+    .fetch_one(&admin_conn)
+    .await?
+    .0;
+
+    let account_db_url = add_account_to_pools(
+        &account_pools,
+        &admin_url,
+        account_id,
+        &db_username,
+        &encrypted_db_password,
+        database_url
+    )
+        .await
+        .map_err(|err| {
+            eprintln!("ERROR ADDING NEW ACCOUNT TO POOL: {:?}", err)
+        }).unwrap();       
     
-    let account_db_url = get_account_psql_link(db_username, encrypted_db_password, database_url);
    
     let account_conn = PgPoolOptions::new()
         .max_connections(2)
         .connect(&account_db_url)
-        .await?;
-
-    let _ = install_extensions(&admin_url, &snake_case_name)
-        .await;
+        .await
+        .map_err(|err| {
+            eprintln!("ERROR CONNECTING TO NEW ACCOUNT POOL: {:?}", err)
+        }).unwrap();
 
     let _new_store_table_if_not_created = sqlx::query(
         r#"
@@ -127,7 +147,10 @@ pub async fn create_account(
         "#
     )
     .execute(&account_conn)
-    .await;
+    .await
+    .map_err(|err| {
+        eprintln!("ERROR CREATING STORES TABLE: {:?}", err)
+    });
 
     let new_store_table_if_not_created = sqlx::query(
         r#"
@@ -148,16 +171,15 @@ pub async fn create_account(
 
       Err(err) => {
         HttpResponse::InternalServerError().json(serde_json::json!({
-          "status": "error",
+          "status": 500,
           "message": format!("Failed to create 'store' table for {}: {}", &req.username, err)
         }));
       }
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": 200,
         "db_name ": snake_case_name,
-        "dashboard_username ": dashboard_username,
-        "dashboard_password ": dashboard_password,
     })))
 }
 

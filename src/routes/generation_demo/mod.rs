@@ -1,42 +1,42 @@
 use actix_web::{Result, Error, HttpResponse, post, web};
 use serde_json;
 use sqlx::{Pool, Postgres};
-use crate::models::generation_models::{Payload};
-
+use crate::models::generation_models::{DemoPayload};
+use crate::models::pools_models::AccountPools;
 mod add_products_suggestion;
 use add_products_suggestion::add_products_suggestion;
 mod parse_response;
 use parse_response::parse_response;
+use crate::helpers::target_pool::target_account_pool;
 
-
-#[post("/generate")]
-pub async fn generate_gemma (payload: web::Json<Payload>, pool: web::Data<Pool<Postgres>>) -> Result<HttpResponse, Error>  {
+#[post("/generate/demo")]
+pub async fn generation_demo (
+  payload: web::Json<DemoPayload>,   
+  account_pools: web::Data<AccountPools>,
+) -> Result<HttpResponse, Error>  {
+ 
   dotenv::dotenv().ok();
+  let user_id_string = std::env::var("DEMO_ACCOUNT_ID").expect("No id");
   let req = payload.into_inner();
 
-  // Make this more dynamic in the future
-  let target_table = "public.products";
-
-
-  println!("[USER PROMPT]: {}", req.prompt);
+  let account_conn: Pool<Postgres> = target_account_pool(user_id_string, account_pools).unwrap();
 
   let response_with_products = add_products_suggestion(
-        req,
-        pool.clone(), 
-        target_table
+        req.clone(),
+        account_conn.clone(), 
   )
     .await
     .expect("Error generating response with product embedding");
 
-  // println!("RESPONSE: {}", response_with_products);
-
   let parsed_response = parse_response(
     response_with_products, 
-    pool.clone())
-        .await
-        .expect("Error parsing first response to extract text and products.");
+    account_conn,
+    req.selector
+  
+  )
+    .await
+    .expect("Error parsing first response to extract text and products.");
 
-  // println!("PARSED MESSAGE: {}", parsed_response.text);
 
   Ok(HttpResponse::Ok().json(serde_json::json!({
       "status": 200,

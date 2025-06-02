@@ -1,12 +1,14 @@
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use sqlx::FromRow;
+use bigdecimal::BigDecimal;
+
 
 #[derive(Debug, Serialize, FromRow)]
 pub struct Product {
     pub name: String,
     pub description: String,
-    pub price: String,  // Change to f64 for prices for production
+    pub price: BigDecimal, 
     pub image: String,
     pub handle: String,
     pub vendor: String,
@@ -19,7 +21,14 @@ pub struct Payload {
     pub system_prompt: Option<String>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
+pub struct DemoPayload {
+    pub prompt: String,
+    pub images: Vec<ImageData>, 
+    pub selector: String
+}
+
+#[derive(Deserialize, Clone)]
 pub struct ImageData {
     pub data_url: String,
 }

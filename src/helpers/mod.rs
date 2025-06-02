@@ -5,3 +5,4 @@ pub mod init_all_account_connections;
 pub mod target_pool;
 pub mod modify_types;
 pub mod install_extensions;
+pub mod add_account_to_pools;

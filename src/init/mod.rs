@@ -21,7 +21,7 @@ pub async fn init_pgai (pool: sqlx::Pool<sqlx::Postgres>) -> Result<HttpResponse
     }
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
-        "status": "success",
+        "status": 200,
         "message": "Successfully invoked embedded database from Server"
     })))
 }

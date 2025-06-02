@@ -1,6 +1,7 @@
+use rust_decimal::{prelude::ToPrimitive};
 use sqlx::{Pool, Postgres};
 use crate::models::products_models::Product;
-use chrono::{NaiveDateTime};
+use chrono::{Utc, DateTime};
 use uuid::Uuid;
 
 pub async fn add_products_to_store(
@@ -20,14 +21,14 @@ pub async fn add_products_to_store(
   let descriptions: Vec<String> = products.iter().map(|p| p.description.clone()).collect();
   let handles: Vec<String> = products.iter().map(|p| p.handle.clone()).collect();
   let images: Vec<String> = products.iter().map(|p| p.image.clone()).collect();
-  let prices: Vec<f64> = products.iter().map(|p| p.price.clone()).collect();
+  let prices: Vec<f64> = products.iter().map(|p| p.price.clone().to_f64().unwrap()).collect();
   let seo_descriptions: Vec<String> = products.iter().map(|p| p.seo_description.clone()).collect();
   let seo_titles: Vec<String> = products.iter().map(|p| p.seo_title.clone()).collect();
   let statuses: Vec<String> = products.iter().map(|p| p.status.clone()).collect();
   let tags: Vec<String> = products.iter().map(|p| p.tags.clone()).collect();
-  let updated_ats: Vec<NaiveDateTime> = products.iter().map(|p| p.updated_at.clone()).collect();
+  let updated_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.updated_at.clone()).collect();
   let vendors: Vec<String> = products.iter().map(|p| p.vendor.clone()).collect();
-  let created_ats: Vec<NaiveDateTime> = products.iter().map(|p| p.created_at.clone()).collect();
+  let created_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.created_at.clone()).collect();
   let store_ids: Vec<Uuid> = products.iter().map(|p| p.store_id.clone()).collect();
 
   let query_str = format!(

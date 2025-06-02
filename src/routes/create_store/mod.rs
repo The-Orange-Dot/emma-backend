@@ -40,54 +40,39 @@ pub async fn create_store(
           } = payload.into_inner();
           let store_table_name = to_snake_case(&store_name);
           let account_uuid = string_to_uuid(id.clone());
-          let account_conn = target_account_pool(id, account_pools);
+          let account_conn = target_account_pool(id, account_pools)?;
           let store_uuid = Uuid::new_v4();
 
-
-
-
-      println!("[DEBUG] STORENAME: {:?}", store_name);
-      println!("[DEBUG] DOMAIN: {:?}", domain);
-      println!("[DEBUG] PLATFORM: {:?}", platform);
-      println!("[DEBUG] SHOPIFY_NAME: {:?}", shopify_storefront_store_name);
-      println!("[DEBUG] SHOPIFY ACCESS TOKEN: {:?}", shopify_storefront_access_token);
-      println!("[DEBUG] CSV: {:?}", csv[0]);
-
-          // INSERTS STORE INTO STORES TABLE
-          let new_store = sqlx::query(
-                "
-                  INSERT INTO stores (
-                  id, account_id, store_name, 
-                  store_table, domain, 
-                  platform, sys_prompt) 
-                  VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "
-              )
-                .bind(&store_uuid)
-                .bind(&account_uuid)
-                .bind(&store_name)
-                .bind(&store_table_name)
-                .bind(domain)
-                .bind(platform)
-                .bind("")
-                .execute(&account_conn)
-                .await
-                .map_err(|err| {
-                  HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Internal server error: {}", err),
-                    "response": []
-                  }));
-                  actix_web::error::ErrorInternalServerError(format!("Error creating new store: {}.", err))
-                })?;
-
-          if new_store.rows_affected() == 0 {
-              return Ok(HttpResponse::NotFound().json(serde_json::json!({
-                  "status": "error",
-                  "message": format!("Error creating store: {}", &store_name),
+          let _new_store = sqlx::query(
+              "
+                INSERT INTO stores (
+                id, account_id, store_name, 
+                store_table, domain, 
+                platform, sys_prompt, 
+                shopify_storefront_access_token, 
+                shopify_storefront_store_name) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              "
+          )
+          .bind(&store_uuid)
+          .bind(&account_uuid)
+          .bind(&store_name)
+          .bind(&store_table_name)
+          .bind(domain)
+          .bind(&platform)
+          .bind("")
+          .bind(shopify_storefront_store_name)
+          .bind(shopify_storefront_access_token)
+          .execute(&account_conn)
+          .await
+          .map_err(|err| {
+              HttpResponse::InternalServerError().json(serde_json::json!({
+                  "status": 500,
+                  "message": format!("Internal server error: {}", err),
                   "response": []
-              })));
-          }
+              }));
+              actix_web::error::ErrorInternalServerError(format!("Error creating new store: {}.", err))
+          }).unwrap();
 
           // CREATES PRODUCTS TABLE
           let table_name = format!("{}_products", store_table_name);
@@ -119,7 +104,7 @@ pub async fn create_store(
             .execute(&account_conn)
             .await;
 
-          let add_table_to_product_store = sqlx::query(
+          let _add_table_to_product_store = sqlx::query(
             "
               INSERT INTO store_products (store_id, products_table_name)
               VALUES ($1, $2)               
@@ -133,8 +118,10 @@ pub async fn create_store(
           match new_products_table {
             Ok(_) => {
 
+                if platform == "csv" {
                 let _ = upload_csv_to_database(account_conn.clone(), csv.clone(), store_table_name.clone(), store_uuid)
                     .await;
+                }
 
                 attach_embed_data_checker(account_conn.clone(), 60 * 60 * 12, store_table_name.clone())
                   .await;
@@ -146,7 +133,7 @@ pub async fn create_store(
           }
 
           Ok(HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
+            "status": 200,
             "message": "Store created",
             "response": []
           })))
@@ -155,7 +142,7 @@ pub async fn create_store(
       Err(err) => {
         eprintln!("Error fetching stores: {:?}", err);
           Ok(HttpResponse::Unauthorized().json(serde_json::json!({
-          "status": "unauthorized",
+          "status": 401,
           "message": "Invalid or missing token",
           "response": []
         })))
