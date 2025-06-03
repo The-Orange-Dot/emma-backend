@@ -55,7 +55,7 @@ let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
       .await
       .map_err(|e| {
           eprintln!("Failed to fetch products: {}", e);
-          actix_web::error::ErrorInternalServerError("Database error")
+          return actix_web::error::ErrorInternalServerError("Database error")
       })?
   } else {
       Vec::new()
@@ -73,7 +73,7 @@ let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
 
   // Converts products vector to a valid json array for frontend 
   let json_response = serde_json::to_value(&unique_products).map_err(|_| {
-      actix_web::error::ErrorInternalServerError("Failed to serialize products")
+      return actix_web::error::ErrorInternalServerError("Failed to serialize products")
   })?;
 
   Ok(ParsedResponse {

@@ -44,21 +44,21 @@ pub async fn _generate_response(images: Vec<ImageData>,
   .await
   .map_err(|err| {
     eprint!("Failed to connect to Gemma3: {}", err);
-    actix_web::error::ErrorInternalServerError("Failed to connect to Gemma3")
+    return actix_web::error::ErrorInternalServerError("Failed to connect to Gemma3")
   })?
   // Reads the json data to prepare to parse
   .text()
   .await
   .map_err(|err| {
     eprint!("Failed to read Gemma3 response: {}", err);
-    actix_web::error::ErrorInternalServerError("Failed to parse Gemma3 Response")
+    return actix_web::error::ErrorInternalServerError("Failed to parse Gemma3 Response")
   })?;
 
   // Parses the response to extract the AI text
   let api_response : serde_json::Value = serde_json::from_str(&response)
   .map_err(|err| {
     eprint!("Failed to parse Gemma3 response: {}", err);
-    actix_web::error::ErrorInternalServerError("Failed to parse Gemma3 response")
+    return actix_web::error::ErrorInternalServerError("Failed to parse Gemma3 response")
   })?;
 
   let response_text = &api_response["response"];

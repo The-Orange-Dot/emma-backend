@@ -1,4 +1,4 @@
-use actix_web::{Result, Error, HttpResponse, post, web};
+use actix_web::{HttpResponse, post, web};
 use serde_json;
 use sqlx::{Pool, Postgres};
 use crate::models::generation_models::{Payload};
@@ -10,7 +10,7 @@ use parse_response::parse_response;
 
 
 #[post("/generate")]
-pub async fn generate_gemma (payload: web::Json<Payload>, pool: web::Data<Pool<Postgres>>) -> Result<HttpResponse, Error>  {
+pub async fn generate_gemma (payload: web::Json<Payload>, pool: web::Data<Pool<Postgres>>) -> HttpResponse  {
   dotenv::dotenv().ok();
   let req = payload.into_inner();
 
@@ -26,22 +26,34 @@ pub async fn generate_gemma (payload: web::Json<Payload>, pool: web::Data<Pool<P
         target_table
   )
     .await
-    .expect("Error generating response with product embedding");
-
+    .map_err(|err| {
+        eprint!("Error parsing products in response: {:?}", err);
+        HttpResponse::InternalServerError().json(serde_json::json!({
+          "status": 500,
+          "message": format!("Error parsing product in response: {:?}", err),
+          "response": []
+        }))
+    }).unwrap();
+    
   // println!("RESPONSE: {}", response_with_products);
 
   let parsed_response = parse_response(
     response_with_products, 
     pool.clone())
         .await
-        .expect("Error parsing first response to extract text and products.");
-
+        .map_err(|err| {
+            HttpResponse::InternalServerError().json(serde_json::json!({
+              "status": 500,
+              "message": format!("Error parsing response from Emma: {}", err),
+              "response": []
+            }))
+        }).unwrap();
   // println!("PARSED MESSAGE: {}", parsed_response.text);
 
-  Ok(HttpResponse::Ok().json(serde_json::json!({
+  HttpResponse::Ok().json(serde_json::json!({
       "status": 200,
       "message": "Successfully received message from Server",
       "response": parsed_response.text,
       "products": parsed_response.products
-  })))
+  }))
 }

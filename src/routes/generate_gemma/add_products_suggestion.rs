@@ -1,4 +1,4 @@
-use actix_web::{Result, Error};
+use actix_web::{ HttpResponse, Result};
 use sqlx::{Pool, Postgres};
 use crate::models::generation_models::{Payload};
 
@@ -6,7 +6,7 @@ pub async fn add_products_suggestion(
     req: Payload,
     pool: actix_web::web::Data<Pool<Postgres>>,
     _table: &str,
-) -> Result<String, Error> {
+) -> Result<String, HttpResponse> {
     dotenv::dotenv().ok();
     let model = std::env::var("LLM_MODEL")
         .expect("No model has been set for PGAI context prompt");
@@ -70,7 +70,11 @@ pub async fn add_products_suggestion(
         .await
         .map_err(|err| {
             eprintln!("Database error: {:?}\nQuery: {}", err, query);
-            actix_web::error::ErrorInternalServerError("Failed to generate product suggestions")
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": 500,
+                "message": format!("Failed to parse products: {}", err),
+                "response": []
+            }))
         })?;
 
     Ok(response)
