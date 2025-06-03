@@ -7,7 +7,7 @@ pub async fn install_extensions(admin_conn_str: &str, db_name: &str) -> Result<(
         .connect(&format!("{}/{}", admin_conn_str, db_name))  // Connects to `db_name`
         .await?;
 
-    let extensions = ["vector", "vectorscale", "plpython3u", "ai", "pgcrypto", "plpgsql"];
+    let extensions = ["vector", "vectorscale", "plpython3u", "ai", "pgcrypto", "plpgsql", "pg_trgm"];
 
     for extension in extensions {
         let vector_ext = sqlx::query(&format!("CREATE EXTENSION IF NOT EXISTS {}", extension) )

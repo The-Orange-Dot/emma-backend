@@ -57,7 +57,8 @@ pub fn parse_shopify_products(response: ShopifyProductResponse, store_uuid: Uuid
             category: shopify_product.product_type,
             status: "active".to_string(),
             tags: shopify_product.tags.join(","),
-            store_id: store_uuid
+            store_id: store_uuid,
+            product_url: "".to_string()
         })
     }).collect()
 }

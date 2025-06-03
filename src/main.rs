@@ -77,6 +77,8 @@ async fn main() -> Result<(), Error> {
         .service(routes::me::me) // GET
         .service(routes::get_store_products::get_store_products) // GET
         .service(routes::generation_demo::generation_demo) // POST
+        .service(routes::add_products_to_store::add_products_to_store) // POST
+        .service(routes::embed_table::embed_table) // POST
     })     
         .bind(("127.0.0.1", 8080))?
         .run()

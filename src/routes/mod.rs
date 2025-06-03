@@ -10,3 +10,5 @@ pub mod me;
 pub mod logout_account;
 pub mod get_store_products;
 pub mod generation_demo;
+pub mod add_products_to_store;
+pub mod embed_table;

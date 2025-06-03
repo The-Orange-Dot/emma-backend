@@ -8,5 +8,5 @@ pub fn verify_token(token: &str) -> Result<String, &'static str> {
         &validation,
     ).map_err(|_| "Invalid token")?;
 
-    Ok(token_data.claims.sub) // Return user ID
+    Ok(token_data.claims.sub)
 }

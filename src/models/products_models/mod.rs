@@ -22,5 +22,6 @@ pub struct Product {
   pub status: String,
   pub category: String,  
   pub tags: String,
-  pub store_id: Uuid
+  pub store_id: Uuid,
+  pub product_url: String
 }

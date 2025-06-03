@@ -18,7 +18,7 @@ pub async fn attach_embed_data_checker(pool: sqlx::Pool<Postgres>, timer: u64, s
 
             match result {
                 Ok(res) => {
-                    println!("Embedder now checking products on {} ", store_name);
+                    println!("[PROCESSING]: Embedding products on {} ", store_name);
                     Ok(res)
                 },
                 Err(e) => {

@@ -1,6 +1,6 @@
 use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
-use crate::models::generation_models::{DemoPayload};
+use crate::models::{generation_models::DemoPayload, store_models::Store};
 
 pub async fn add_products_suggestion(
     req: DemoPayload,
@@ -9,7 +9,6 @@ pub async fn add_products_suggestion(
     dotenv::dotenv().ok();
     let model = std::env::var("LLM_MODEL")
         .expect("No model has been set for PGAI context prompt");
-
     // Prepare base64 images for PostgreSQL
     let image_params = if !req.images.is_empty() {
         let image_strings = req.images.iter()
@@ -27,17 +26,61 @@ pub async fn add_products_suggestion(
         format!("ARRAY[{}]", image_strings)
     } else {
         "NULL::bytea[]".to_string()
-    };
+    };  
 
-    let sys_prompt = format!("");
+    let store = sqlx::query_as::<_, Store>("SELECT * FROM stores WHERE store_table = $1")
+        .bind(&req.selector)
+        .fetch_one(&pool)
+        .await
+        .map_err(|err| {
+            eprint!("Error fetching store data: {}", err);
+        }).unwrap();
+        
+    let formatted_sys_prompt = store.sys_prompt.replace("'", "''");
 
     let query = format!(
         r#"
-        WITH relevant_products AS (
-            SELECT *
-            FROM {}_products
-            ORDER BY embedding <=> ai.ollama_embed('nomic-embed-text', $1)
-            LIMIT 10
+        WITH product_embeddings AS (
+            SELECT 
+                p.id,
+                p.name,
+                p.seo_title,
+                p.description,
+                p.category,
+                p.tags,
+                p.seo_description,
+                e.embedding
+            FROM {}_products p
+            JOIN {}_embeddings e ON p.id = e.product_id
+        ),
+        relevant_chunks AS (
+            SELECT 
+                pe.id,
+                pe.name,
+                pe.seo_title,
+                pe.tags,
+                pe.category,
+                pe.seo_description,
+                pe.description,
+                pe.embedding <=> ai.ollama_embed('nomic-embed-text', $1) as distance
+            FROM product_embeddings pe
+            ORDER BY distance
+            LIMIT 50
+        ),
+        relevant_products AS (
+            SELECT 
+                id,
+                name,
+                description,
+                tags,
+                category,
+                seo_description,
+                seo_title,
+                MIN(distance) as min_distance
+            FROM relevant_chunks
+            GROUP BY id, name, description, tags, seo_description, seo_title, category
+            ORDER BY min_distance
+            LIMIT 15
         ),
         context_agg AS (
             SELECT string_agg(name || ' - ' || seo_title, ', ') AS context_chunk
@@ -46,20 +89,26 @@ pub async fn add_products_suggestion(
         SELECT ai.ollama_generate(
             '{}',
             'You should always add products from the context in your response ' ||
-            'Try to suggest up to 3 products, but no more than 4. ' ||
+            'Suggest up to 3-6 products from the context in the your response ' ||
             'You dont need to compliment the client.' ||
-            'Include the products as a list at the end of the response each have to be in their own square brackets with no commas between them [Like] [This].\n\n' ||
+            'Any products you suggest in context should be in bold text' ||
+            'You must always include the context products you suggested as a list at the end of the response each have to be in their own square brackets with no commas between them [Like] [This].\n\n' ||
             'User query: ' || $1 || '\n\n' ||
             'Relevant products: ' || (SELECT context_chunk FROM context_agg),
             system_prompt => 'Your job is to look at the image given to you and answer any questions that are asked. 
-            You must NEVER give medical or legal advice to the clients. 
-            Keep your answers at around 300 words. {}',
+            You need to talk to the client as you are a specialist or guru consulting them.
+            Never acknowledge that you are a chatbot or ai. 
+            Never include links in your response.
+            You must never say that you are suggesting products. 
+            Just include it in the conversation organically.
+            You must keep your answers at under 200 words but over 150 words. {}',
             images => {}
         )->>'response' as response
         "#,
         req.selector,
+        req.selector,
         model,
-        sys_prompt,
+        formatted_sys_prompt,
         image_params
     );
 
@@ -68,7 +117,7 @@ pub async fn add_products_suggestion(
         .fetch_one(&pool)
         .await
         .map_err(|err| {
-            eprintln!("Database error: {:?}\nQuery: {}", err, query);
+            eprintln!("Database error: {:?}", err, );
             actix_web::error::ErrorInternalServerError("Failed to generate product suggestions")
         })?;
 

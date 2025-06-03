@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::models::generation_models::{Product};
+use crate::models::{generation_models::Product, store_models::Store};
 use actix_web::{Result};
 use sqlx::{Pool, Postgres};
 use regex;
@@ -11,78 +11,94 @@ pub async fn parse_response(
     selector: String
 ) -> Result<ParsedResponse, actix_web::Error>{
 
-// Parses text to extract text and products wrapped in square brackets
-let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
-  let products: Vec<String> = re.captures_iter(&response_with_product_suggestions)
-      .map(|cap| cap[1].trim().to_string())
-      .collect();
+    // Parses text to extract text and products wrapped in square brackets
+    let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
+    let products: Vec<String> = re.captures_iter(&response_with_product_suggestions)
+        .map(|cap| cap[1].trim().to_string())
+        .collect();
 
-  // This will change the product's "" to a '' for psql since "" will search columns rather than rows
-  let formatted_products_array = format!(
-      "{}", 
-      products.iter()
-          .map(|s| format!("'{}'", s.replace("'", "''"))) // Escape single quotes
-          .collect::<Vec<_>>()
-          .join(", ")
-  );
+    // This will change the product's "" to a '' for psql since "" will search columns rather than rows
+    let formatted_products_array = format!(
+        "{}", 
+        products.iter()
+            .map(|s| format!("'{}'", s.replace("'", "''"))) // Escape single quotes
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
-  // Remove product references from original response
-  let cleaned_response = re.replace_all(&response_with_product_suggestions, "")
-      .trim()
-      .to_string();
+    println!("Extracted products: {:?}", formatted_products_array);
 
-//   println!("Extracted products: {:?}", products);
+    // Remove product references from original response
+    let cleaned_response = re.replace_all(&response_with_product_suggestions, "")
+        .trim()
+        .to_string();
 
-  let query = format!(
-      r#"
-          SELECT name, description, price, image, handle, vendor FROM {}_products
-          WHERE seo_title % ANY(ARRAY[{}])
-          ORDER BY (
-              SELECT MAX(similarity(seo_title, term))
-              FROM UNNEST(ARRAY[{}]) AS term
-              WHERE seo_title % term
-              OR name % term
-          ) DESC
-          LIMIT 5;
-      "#,
-      selector,
-      formatted_products_array,
-      formatted_products_array
-  );
 
-  // Takes extracted product titles and searches the database for them.
-  // If none are found then itll just return an empty vector
-  let product_rows: Vec<Product> = if !products.is_empty() {
-      sqlx::query_as::<_, Product>(&query)
-      .bind(&products)
-      .fetch_all(&pool)
-      .await
-      .map_err(|e| {
-          eprintln!("Failed to fetch products: {}", e);
-          actix_web::error::ErrorInternalServerError("Database error")
-      })?
-  } else {
-      Vec::new()
-  };
+    let query = format!(
+        r#"
+        SELECT name, description, price, product_url, image, handle, vendor
+        FROM {}_products
+        WHERE seo_title % ANY($1::text[]) OR name % ANY($1::text[])
+        ORDER BY GREATEST(
+            (SELECT MAX(similarity(seo_title, term)) FROM UNNEST($1::text[]) AS term WHERE seo_title % term),
+            (SELECT MAX(similarity(name, term)) FROM UNNEST($1::text[]) AS term WHERE name % term)
+        ) DESC
+        LIMIT 6;
+        "#,
+        selector
+    );
+        
+    // Takes extracted product titles and searches the database for them.
+    // If none are found then itll just return an empty vector
+    let product_rows: Vec<Product> = if !products.is_empty() {
+        sqlx::query_as::<_, Product>(&query)
+        .bind(&products)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to fetch products: {}", e);
+            actix_web::error::ErrorInternalServerError("Database error")
+        })?
+    } else {
+        Vec::new()
+    };
 
-  let mut unique_products:Vec<Product> = Vec::new();
-  let mut seen_names: HashSet<String> = std::collections::HashSet::new();
+    // println!("DEBUG: {:?}", product_rows[0] );
+    
+    // Fetches store data to send domain to the front
+    let store_data = sqlx::query_as::<_, Store>(
+        "SELECT * FROM stores WHERE store_table = $1"
+    )
+        .bind(&selector)
+        .fetch_one(&pool)
+        .await
+        .map_err(|err| {
+            eprint!("Error fetching store domain: {}", err);
+        }).unwrap();
 
-  // Will remove any duplicate products that have been found while chunking
-  for product in product_rows {
-      if seen_names.insert(product.name.clone()) {
-          unique_products.push(product);
-      }
-  }
+    // println!("DEBUG: {:?}", store_data);
 
-  // Converts products vector to a valid json array for frontend 
-  let json_response = serde_json::to_value(&unique_products).map_err(|_| {
-      actix_web::error::ErrorInternalServerError("Failed to serialize products")
-  })?;
+    let mut unique_products:Vec<Product> = Vec::new();
+    let mut seen_names: HashSet<String> = std::collections::HashSet::new();
 
-  Ok(ParsedResponse {
-      text: cleaned_response,
-      products: json_response,
-  })
+    // Will remove any duplicate products that have been found while chunking
+    for product in product_rows {
+        if seen_names.insert(product.name.clone()) {
+            unique_products.push(product);
+        }
+    }
+
+
+    // Converts products vector to a valid json array for frontend 
+    let json_response = serde_json::to_value(&unique_products).map_err(|_| {
+        actix_web::error::ErrorInternalServerError("Failed to serialize products")
+    })?;
+    // println!("DEBUG: {:?}", json_response[0]["product_url"]);
+
+    Ok(ParsedResponse {
+        text: cleaned_response,
+        products: json_response,
+        store_domain: store_data.domain,
+    })
 
 }

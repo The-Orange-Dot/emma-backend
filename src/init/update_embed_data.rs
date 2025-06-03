@@ -2,49 +2,104 @@ use sqlx::{Postgres, postgres::PgQueryResult};
 use chrono::Utc;
 
 pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, store_name: String) -> Result<PgQueryResult, sqlx::Error> {
-        
-        let query = format!(
-            "
-                WITH target_products AS (
-                    SELECT id 
-                    FROM {}_products
-                    WHERE 
-                        EMBEDDING IS NULL 
-                        OR updated_at > COALESCE(
-                            (SELECT MAX(updated_at) FROM {}_products),
-                            TIMESTAMP '1970-01-01'
-                        )
-                    ORDER BY
-                        CASE WHEN EMBEDDING IS NULL THEN 0 ELSE 1 END,
-                        updated_at ASC
-                    LIMIT 100
-                    FOR UPDATE SKIP LOCKED
+    // First, ensure the embeddings table exists
+    create_embeddings_table(&pool, &store_name).await?;
+    
+    let query = format!(
+        "
+        WITH target_products AS (
+            SELECT id, name, price, description, tags, seo_description, seo_title, category, published, status
+            FROM {}_products
+            WHERE 
+                NOT EXISTS (
+                    SELECT 1 FROM {}_embeddings 
+                    WHERE {}_embeddings.product_id = {}_products.id
                 )
-                UPDATE {}_products 
-                SET 
-                    EMBEDDING = ai.ollama_embed(
-                        'nomic-embed-text', 
-                        format('NAME: %s - 
-                        PRICE: %s - 
-                        DESCRIPTION: %s %s %s %s - 
-                        CATEGORY: %s 
-                        STATUS: %s %s - ', 
-                        name, price, description, tags, seo_description, 
-                        seo_title, category, published, status)
-                    ),
-                    updated_at = $1
-                WHERE id IN (SELECT id FROM target_products)
-            ", 
-            store_name, 
-            store_name, 
-            store_name
-        );
+                OR updated_at > COALESCE(
+                    (SELECT MAX(created_at) FROM {}_embeddings WHERE product_id = {}_products.id),
+                    TIMESTAMP '1970-01-01'
+                )
+            ORDER BY
+                CASE WHEN NOT EXISTS (
+                    SELECT 1 FROM {}_embeddings 
+                    WHERE {}_embeddings.product_id = {}_products.id
+                ) THEN 0 ELSE 1 END,
+                updated_at ASC
+            LIMIT 100
+            FOR UPDATE SKIP LOCKED
+        ),
+        product_chunks AS (
+            SELECT 
+                id as product_id,
+                substring(
+                    format('NAME: %s - PRICE: %s - DESCRIPTION: %s %s %s %s - CATEGORY: %s STATUS: %s %s - ',
+                    name, price, description, tags, seo_description, seo_title, category, published, status)
+                    from (1 + (n-1)*512) for 512
+                ) as chunk_text,
+                n as chunk_index
+            FROM target_products,
+            LATERAL (
+                SELECT generate_series(
+                    1, 
+                    ceil(
+                        length(
+                            format('NAME: %s - PRICE: %s - DESCRIPTION: %s %s %s %s - CATEGORY: %s STATUS: %s %s - ',
+                            name, price, description, tags, seo_description, seo_title, category, published, status)
+                        )::numeric / 512.0
+                    )::integer
+                ) as n
+            ) chunks
+        )
+        INSERT INTO {}_embeddings (product_id, chunk_index, chunk_text, embedding, created_at)
+        SELECT 
+            product_id,
+            chunk_index,
+            chunk_text,
+            ai.ollama_embed('nomic-embed-text', chunk_text),
+            $1
+        FROM product_chunks
+        ON CONFLICT (product_id, chunk_index) 
+        DO UPDATE SET
+            embedding = EXCLUDED.embedding,
+            created_at = EXCLUDED.created_at
+        ",
+        store_name, 
+        store_name,
+        store_name, store_name,
+        store_name, store_name,
+        store_name,
+        store_name, store_name,
+        store_name
+    );
 
-            let current_time = Utc::now();
-            let result = sqlx::query(&query)
-            .bind(current_time)
-            .execute(&pool)
-            .await;
+    let current_time = Utc::now();
+    let result = sqlx::query(&query)
+        .bind(current_time)
+        .execute(&pool)
+        .await
+        .map_err(|err| {
+            eprintln!("Error embedding data on embedding table: {}", err);
+        }).unwrap();
 
-            result
+    Ok(result)
+}
+
+async fn create_embeddings_table(pool: &sqlx::Pool<Postgres>, store_name: &str) -> Result<(), sqlx::Error> {
+
+    let query = format!(
+        "CREATE TABLE IF NOT EXISTS {}_embeddings (
+            id SERIAL PRIMARY KEY,
+            product_id INTEGER NOT NULL REFERENCES {}_products(id),
+            chunk_index INTEGER NOT NULL,
+            chunk_text TEXT NOT NULL,
+            embedding VECTOR(768) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            UNIQUE(product_id, chunk_index)
+        )",
+        store_name, store_name
+    );
+    
+    let _ = sqlx::query(&query).execute(pool).await;
+    Ok(())
+
 }

@@ -18,6 +18,8 @@ struct LoginPayload {
     password: String,
 }
 
+// NEED AN HTTPRESPONSE FOR IF AN ACCOUNT DOESNT EXIST!!
+
 #[post("/login")]
 pub async fn login_account(
     payload: web::Json<LoginPayload>,

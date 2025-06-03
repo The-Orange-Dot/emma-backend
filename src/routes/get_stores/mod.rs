@@ -10,12 +10,12 @@ pub async fn get_stores(
   account_pools: web::Data<AccountPools>,
   req: HttpRequest,
 ) -> HttpResponse{
-  let id_string = token_to_string_id(req);
+  let id_string: Result<String, HttpResponse> = token_to_string_id(req);
 
 
   match id_string {
     Ok(id) => {
-      let account_conn = target_account_pool(id, account_pools).unwrap();
+      let account_conn: sqlx::Pool<sqlx::Postgres> = target_account_pool(id, account_pools).unwrap();
 
 
         let stores = sqlx::query_as::<_, Store>("
@@ -62,10 +62,3 @@ pub async fn get_stores(
 
  
 }
-
-
-// THIS HAS NOTHING TO DO WITH FETCHING STORES. IF FETCHES PRODUCTS
-// I PUT THIS HERE JUST BECAUSE
-// USE THIS TO GET PRODUCTS FROM A PARTICULAR STORE
-// SELECT * FROM carmindy_products 
-// WHERE store_id = (SELECT id FROM stores WHERE store_table = 'carmindy');

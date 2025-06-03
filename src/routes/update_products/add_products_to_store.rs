@@ -26,6 +26,7 @@ pub async fn add_products_to_store(
   let seo_titles: Vec<String> = products.iter().map(|p| p.seo_title.clone()).collect();
   let statuses: Vec<String> = products.iter().map(|p| p.status.clone()).collect();
   let tags: Vec<String> = products.iter().map(|p| p.tags.clone()).collect();
+  let product_urls: Vec<String> = products.iter().map(|p| p.product_url.clone()).collect();
   let updated_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.updated_at.clone()).collect();
   let vendors: Vec<String> = products.iter().map(|p| p.vendor.clone()).collect();
   let created_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.created_at.clone()).collect();
@@ -53,7 +54,8 @@ pub async fn add_products_to_store(
           $12::text[],
           $13::text[],
           $14::text[],
-          $15::Uuid[]
+          $15::text[],
+          $16::Uuid[]
       ) ON CONFLICT (id) DO NOTHING
       "#,
       table_name
@@ -74,6 +76,7 @@ pub async fn add_products_to_store(
       .bind(&seo_descriptions)
       .bind(&categories)
       .bind(&statuses)
+      .bind(&product_urls)
       .bind(&tags)
       .bind(&store_ids)
       .execute(&account_conn)

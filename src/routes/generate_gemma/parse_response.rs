@@ -71,6 +71,15 @@ let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
       }
   }
 
+    // let store_data = sqlx::query_as::<_, Store>(
+    //     "SELECT domain FROM stores WHERE database_table = $1"
+    // )
+    //     .bind(&selector)
+    //     .fetch_one(&pool)
+    //     .await
+    //     .expect("Couldnt fetch store url");
+
+
   // Converts products vector to a valid json array for frontend 
   let json_response = serde_json::to_value(&unique_products).map_err(|_| {
       return actix_web::error::ErrorInternalServerError("Failed to serialize products")
@@ -79,6 +88,7 @@ let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
   Ok(ParsedResponse {
       text: cleaned_response,
       products: json_response,
+      store_domain: "test".to_string()
   })
 
 }
