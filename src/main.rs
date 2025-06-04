@@ -14,6 +14,7 @@ mod auth;
 
 #[actix_web::main]
 async fn main() -> Result<(), Error> {
+    env_logger::init();
 
     dotenv::dotenv().ok();
     let admin_url = std::env::var("DATABASE_URL")
@@ -80,9 +81,10 @@ async fn main() -> Result<(), Error> {
         .service(routes::add_products_to_store::add_products_to_store) // POST
         .service(routes::embed_table::embed_table) // POST
     })     
-        .bind(("127.0.0.1", 8080))?
+        .bind(("0.0.0.0", 8080))?
+        .expect("Failed to bind to port 8080")  // Explicit panic
         .run()
-        .await?;
+        .await;
 
     Ok(())
 }

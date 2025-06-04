@@ -1,8 +1,7 @@
-FROM rust:1.87 as builder
+FROM rust:1.87 AS builder
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-    && rustup target add x86_64-unknown-linux-musl
+    && apt-get install --no-install-recommends -y pkg-config libssl-dev
 
 WORKDIR /app
 
@@ -15,15 +14,24 @@ RUN mkdir -p src \
 
 COPY . .
 
-RUN cargo build --release --target x86_64-unknown-linux-musl
+RUN cargo build --release
 
-FROM alpine:latest
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/emma-backend ./
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN useradd -m appuser
 USER appuser
 
+COPY --from=builder /app/target/release/emma-backend /app/
+
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:8080/health || exit 1
+
 CMD ["/app/emma-backend"]
+
+# docker build --platform linux/amd64 -t orangedot/emma-backend:v1 .
