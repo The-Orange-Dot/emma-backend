@@ -44,7 +44,7 @@ pub async fn update_products(
 
   match user_id {
     Ok(id) => {
-        let account_conn = target_account_pool(id.clone(), account_pools).unwrap();
+        let account_conn: sqlx::Pool<sqlx::Postgres> = target_account_pool(id.clone(), account_pools).unwrap();
         let store_uuid = string_to_uuid(store_id);
 
         let store_res = sqlx::query_as::<_, Store>(

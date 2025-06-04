@@ -1,3 +1,16 @@
+# Rust build artifacts
+/target/
+target/
+**/*.rs.bk
+
+# Optional but recommended for IDE files
+.idea/
+.vscode/
+
+# Environment files
 .env
-.encryption_key
-target
+*.env
+
+# Docker
+Dockerfile.local
+docker-compose*.yml

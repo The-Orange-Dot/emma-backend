@@ -38,7 +38,7 @@ async fn main() -> Result<(), Error> {
 }
     let _preloads_model = preload_model(admin_pool.clone())
         .await
-        .expect("Could ne establish connection to LLM Server");
+        .expect("Couldn't establish connection to LLM Server");
 
     println!("===[ Successfully started ]===");
 

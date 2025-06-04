@@ -1,5 +1,9 @@
+use std::time::Duration;
+
 use sqlx::{self, Postgres, Pool};
 use actix_web::{Result, Error};
+use tokio::time;
+
 
 pub async fn preload_model (pool: Pool<Postgres>) -> Result<(), Error> {
   dotenv::dotenv().ok();
@@ -14,21 +18,25 @@ pub async fn preload_model (pool: Pool<Postgres>) -> Result<(), Error> {
     )", model
   );
 
-  let preloads_model = sqlx::query(
+  let _preloads_modes = loop {
+    match sqlx::query(
     &query
-  ).execute(&pool)
-  .await;
-
-  match preloads_model {
-    Ok(_) => {
-        println!("'{}' has been preloaded.", model);
+  )
+    .execute(&pool)
+    .await
+    {
+      Ok(_res) => {
+        println!("[PING]: '{}' Model Preloaded", model);
+        time::sleep(Duration::from_secs(2900)).await;
+        continue;
+      },
+      Err(err) => {
+        eprint!("Error establishing connection to LLM server: {}", err);
+        eprintln!("Retrying connection in 10 seconds...");
+        time::sleep(Duration::from_secs(10)).await;
+        continue;
+      }
     }
-    Err(err) => {
-        eprint!("'{}' could not be preloaded: {}", model, err);
-        println!("");
-        actix_web::error::ErrorInternalServerError(format!("Failed to preload model: {}", err ));
-    }
-  }
+  };
 
-  Ok(())
 }

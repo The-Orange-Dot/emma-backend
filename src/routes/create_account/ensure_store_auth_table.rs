@@ -7,7 +7,7 @@ pub async fn ensure_store_auth_table(pool: &PgPool) -> Result<(), Box<dyn Error>
         CREATE TABLE IF NOT EXISTS accounts (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             session_id UUID,
-            session_expires TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            session_expires TIMESTAMPTZ,
             username TEXT NOT NULL UNIQUE,
             email VARCHAR(255) CHECK (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'),
             first_name TEXT NOT NULL,

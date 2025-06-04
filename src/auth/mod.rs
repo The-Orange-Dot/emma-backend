@@ -2,6 +2,7 @@ use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey}
 use serde::{Serialize, Deserialize};
 use chrono::{Utc, Duration};
 pub mod token_to_user_id;
+pub mod password_encoder;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {

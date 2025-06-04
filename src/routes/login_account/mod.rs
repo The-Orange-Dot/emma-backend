@@ -31,20 +31,23 @@ pub async fn login_account(
 
     // eprintln!("Attempting login with email: '{}'", &req.email);
 
-    let found_account = sqlx::query_as::<_, Account>(
+    let found_account = match sqlx::query_as::<_, Account>(
         "SELECT * FROM accounts WHERE LOWER(email) = LOWER($1)"
     )
     .bind(&req.email.trim()) 
     .fetch_one(&admin_conn)
     .await
-    .map_err(|err| {
-        eprintln!("Failed to find existing user: {}", err);
-        HttpResponse::Unauthorized().json(serde_json::json!({
-          "status": 401,
-          "message": "Invalid email or password",
-          "response": []
-        }))
-    }).unwrap();
+    {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            eprintln!("Failed to find existing user: {}", err);
+            Err(HttpResponse::Unauthorized().json(serde_json::json!({
+            "status": 401,
+            "message": "Invalid email or password",
+            "response": []
+            })))
+        }
+    }.unwrap();
 
     let stored_hash = PasswordHash::new(&found_account.password)
         .map_err(|err| {
@@ -97,21 +100,23 @@ pub async fn login_account(
             }))
         }
         Err(err) => {
-            let (status_code, error_message) = match err {
+            match err {
                 argon2::password_hash::Error::Password => {
-                    (actix_web::http::StatusCode::UNAUTHORIZED, "Invalid password or email address.")
+                    return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": 401,
+                    "message": "Invalid email or password",
+                    "response": []
+                    }))
                 }
                 _ => {
                     eprintln!("Password verification error: {}", err);
-                    (actix_web::http::StatusCode::INTERNAL_SERVER_ERROR, "Internal server error during authentication.")
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": 500,
+                    "message": "Invalid email or password",
+                    "response": []
+                    }))                    
                 }
             };
-
-            HttpResponse::build(status_code).json(serde_json::json!({
-              "status": status_code.as_str().to_lowercase(),
-              "message": error_message,
-              "response": []
-            }))
         }
     }
 }
