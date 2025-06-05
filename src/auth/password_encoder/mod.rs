@@ -8,21 +8,17 @@ use std::io;
 const ENCRYPTION_KEY: &str = "ENCRYPTION_KEY";
 const NONCE_LENGTH: usize = 12; 
 
-
 pub fn get_key() -> io::Result<Vec<u8>> {
     let env_key = std::env::var(ENCRYPTION_KEY)
-    .expect("No Encryption Key Has been set");
-    let key = general_purpose::STANDARD.decode(env_key.trim())
-    .expect("Error generating key");
+        .map_err(|_| io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("{} environment variable must be set", ENCRYPTION_KEY),
+        ))?;
+
+    println!("Raw ENCRYPTION_KEY: {:?}", env_key); // Add this line
     
-    if key.len() != 32 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "ENCRYPTION_KEY must be 32 bytes (256 bits) after Base64 decoding",
-        ));
-    }
-    
-    Ok(key)
+    general_purpose::STANDARD.decode(env_key.trim())
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 pub fn encrypt_password(plaintext: &str, key: &[u8]) -> Result<String, String> {
@@ -33,7 +29,6 @@ pub fn encrypt_password(plaintext: &str, key: &[u8]) -> Result<String, String> {
     let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())
         .map_err(|e| format!("Encryption failed: {}", e))?;
     
-    // Combine nonce + ciphertext BEFORE encoding
     let mut combined = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
     combined.extend_from_slice(&nonce);
     combined.extend_from_slice(&ciphertext);
@@ -48,7 +43,6 @@ pub fn decrypt_password(ciphertext: &str, key: &[u8]) -> Result<String, String> 
     let bytes = general_purpose::STANDARD.decode(ciphertext)
         .map_err(|e| format!("Base64 decoding failed: {}", e))?;
     
-    // Split nonce and ciphertext
     if bytes.len() < NONCE_LENGTH {
         return Err("Ciphertext too short".into());
     }
