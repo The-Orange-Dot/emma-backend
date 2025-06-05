@@ -13,7 +13,7 @@ use crate::helpers::{
     target_pool::target_admin_pool,
     add_account_to_pools::add_account_to_pools
 };
-use crate::auth::password_encoder::{encrypt_password, get_or_create_dev_key};
+use crate::auth::password_encoder::{encrypt_password, get_key };
 
 mod ensure_store_auth_table;
 use ensure_store_auth_table::ensure_store_auth_table;
@@ -79,7 +79,7 @@ pub async fn create_account(
         };
 
     // CHANGE THIS DURING PRODUCTION
-    let key = get_or_create_dev_key().expect("Failed to create key");
+    let key = get_key().expect("Failed to create key");
     let encrypted_db_password = encrypt_password(&db_password, &key)
         .expect("Failed to encrypt password");
 

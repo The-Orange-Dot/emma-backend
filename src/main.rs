@@ -1,4 +1,4 @@
-use actix_web::{ HttpServer, Error, Result, App, web };
+use actix_web::{ HttpServer, App, web };
 mod routes;
 mod models;
 mod middleware;
@@ -12,13 +12,21 @@ mod helpers;
 use models::pools_models::{AdminPool};
 mod auth;
 
-#[actix_web::main]
-async fn main() -> Result<(), Error> {
-    env_logger::init();
+#[tokio::main]
+async fn main() -> std::io::Result<()>{
+    println!("Starting initialization..."); 
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("CRASH: {}", panic_info);
+    }));        
+
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
 
     dotenv::dotenv().ok();
     let admin_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in environment variables");
+        .expect("DATABASE_URL must be set");
 
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
@@ -35,7 +43,7 @@ async fn main() -> Result<(), Error> {
 
 
     for (_account_id, pool) in account_pools.0.read().unwrap().iter() {
-        init_pgai(pool.clone()).await?;
+        let _ = init_pgai(pool.clone()).await;
 }
     let _preloads_model = preload_model(admin_pool.clone())
         .await
@@ -43,7 +51,7 @@ async fn main() -> Result<(), Error> {
 
     println!("===[ Successfully started ]===");
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
         .wrap(
             Cors::default()
@@ -81,10 +89,11 @@ async fn main() -> Result<(), Error> {
         .service(routes::add_products_to_store::add_products_to_store) // POST
         .service(routes::embed_table::embed_table) // POST
     })     
-        .bind(("0.0.0.0", 8080))?
-        .expect("Failed to bind to port 8080")  // Explicit panic
-        .run()
-        .await;
-
-    Ok(())
+        .bind(("0.0.0.0", 8080))
+        .map_err(|e| {
+            println!("[ERROR] Failed to bind to port 8080: {}", e);
+            e
+        })?;
+        
+    server.run().await
 }

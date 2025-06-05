@@ -1134,6 +1134,7 @@ dependencies = [
  "futures",
  "image",
  "jsonwebtoken",
+ "log",
  "oauth",
  "rand 0.9.1",
  "rand_core 0.9.3",
