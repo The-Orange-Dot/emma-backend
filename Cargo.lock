@@ -1132,6 +1132,7 @@ dependencies = [
  "error",
  "features",
  "futures",
+ "hex",
  "image",
  "jsonwebtoken",
  "log",

@@ -8,7 +8,6 @@ pub async fn preload_model(pool: Pool<Postgres>) -> Result<(), Error> {
     dotenv::dotenv().ok();
     let model = std::env::var("LLM_MODEL").expect("LLM_MODEL not set");
 
-    // Spawn a background task for the infinite loop
     tokio::spawn(async move {
         loop {
             let query = format!(
@@ -29,6 +28,6 @@ pub async fn preload_model(pool: Pool<Postgres>) -> Result<(), Error> {
         }
     });
 
-    Ok(()) // Return immediately (non-blocking)
+    Ok(())
 }
 

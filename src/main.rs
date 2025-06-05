@@ -14,7 +14,12 @@ mod auth;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()>{
+    dotenv::dotenv().ok();
     println!("Starting initialization..."); 
+    let env_key = std::env::var("ENCRYPTION_KEY");
+
+    println!("Raw ENCRYPTION_KEY: {:?}", env_key); // Add this line
+
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("CRASH: {}", panic_info);
     }));        
@@ -24,7 +29,6 @@ async fn main() -> std::io::Result<()>{
         .init();
 
 
-    dotenv::dotenv().ok();
     let admin_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
 
