@@ -5,40 +5,42 @@ use aes_gcm::{
 use base64::{Engine as _, engine::general_purpose};
 use std::io;
 
-const ENV_ENCRYPTION_KEY: &str = "ENCRYPTION_KEY";
-const NONCE_LENGTH: usize = 12; // 96 bits for AES-GCM
+const ENCRYPTION_KEY: &str = "ENCRYPTION_KEY";
+const NONCE_LENGTH: usize = 12; 
 
-/// Retrieves the encryption key from the environment. 
-/// Fails if `ENCRYPTION_KEY` is not set.
+
 pub fn get_key() -> io::Result<Vec<u8>> {
-    let env_key = std::env::var(ENV_ENCRYPTION_KEY)
-        .map_err(|_| io::Error::new(
-            io::ErrorKind::NotFound,
-            format!("{} environment variable must be set", ENV_ENCRYPTION_KEY),
-        ))?;
-
-    general_purpose::STANDARD.decode(env_key.trim())
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    let env_key = std::env::var(ENCRYPTION_KEY)
+    .expect("No Encryption Key Has been set");
+    let key = general_purpose::STANDARD.decode(env_key.trim())
+    .expect("Error generating key");
+    
+    if key.len() != 32 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "ENCRYPTION_KEY must be 32 bytes (256 bits) after Base64 decoding",
+        ));
+    }
+    
+    Ok(key)
 }
 
-/// Encrypts data with a randomly generated nonce
 pub fn encrypt_password(plaintext: &str, key: &[u8]) -> Result<String, String> {
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|e| format!("Failed to create cipher: {}", e))?;
     
-    // Generate random nonce for each encryption
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes())
+        .map_err(|e| format!("Encryption failed: {}", e))?;
     
-    cipher.encrypt(&nonce, plaintext.as_bytes())
-        .map_err(|e| format!("Encryption failed: {}", e))
-        .map(|mut ciphertext| {
-            // Prepend nonce to ciphertext
-            ciphertext.splice(0..0, nonce.iter().cloned());
-            general_purpose::STANDARD.encode(&ciphertext)
-        })
+    // Combine nonce + ciphertext BEFORE encoding
+    let mut combined = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
+    combined.extend_from_slice(&nonce);
+    combined.extend_from_slice(&ciphertext);
+    
+    Ok(general_purpose::STANDARD.encode(&combined))
 }
 
-/// Decrypts data with the nonce included in the ciphertext
 pub fn decrypt_password(ciphertext: &str, key: &[u8]) -> Result<String, String> {
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|e| format!("Failed to create cipher: {}", e))?;
