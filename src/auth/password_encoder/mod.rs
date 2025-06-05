@@ -1,5 +1,5 @@
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng, generic_array::GenericArray},
+    aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm
 };
 use base64::{Engine as _, engine::general_purpose};
@@ -15,8 +15,16 @@ pub fn get_key() -> io::Result<Vec<u8>> {
             format!("{} environment variable must be set", ENCRYPTION_KEY),
         ))?;
     
-    general_purpose::STANDARD.decode(env_key.trim())
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    let key_bytes = general_purpose::STANDARD.decode(env_key.trim())
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+    if key_bytes.len() != 32 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Key must be 32 bytes, got {} bytes", key_bytes.len()),
+        ));
+    }
+    Ok(key_bytes)
 }
 
 pub fn encrypt_password(plaintext: &str, key: &[u8]) -> Result<String, String> {
@@ -35,47 +43,73 @@ pub fn encrypt_password(plaintext: &str, key: &[u8]) -> Result<String, String> {
 }
 
 pub fn decrypt_password(ciphertext: &str, key: &[u8]) -> Result<String, String> {
-    // Debug: Print key and ciphertext metadata
-    println!("Decryption Debug:");
-    println!("Key length: {} bytes", key.len());
-    println!("Key (first 8 bytes): {:02x?}", &key[..8.min(key.len())]);
-    println!("Ciphertext length: {} chars", ciphertext.len());
-    println!("Ciphertext (first 50 chars): {}", &ciphertext[..50.min(ciphertext.len())]);
+    if key.len() != 32 {
+        return Err(format!("Invalid key length: expected 32 bytes, got {}", key.len()));
+    }
 
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| format!("Failed to create cipher: {}", e))?;
-    
-    // Enhanced Base64 decoding
-    let bytes = general_purpose::STANDARD.decode(ciphertext.trim())
-        .map_err(|e| {
-            println!("Base64 decode error: {}", e);
-            format!("Base64 decoding failed: {}", e)
-        })?;
-    
-    println!("Decoded bytes length: {}", bytes.len());
+    let bytes = match general_purpose::STANDARD.decode(ciphertext.trim()) {
+        Ok(b) => b,
+        Err(e) => {
+            println!("BASE64 DECODE ERROR: {}", e);
+            return Err(format!("Base64 decoding failed: {}", e));
+        }
+    };
 
     if bytes.len() < NONCE_LENGTH {
-        println!("Error: Ciphertext only {} bytes, need at least {}", bytes.len(), NONCE_LENGTH);
-        return Err("Ciphertext too short".into());
+        return Err(format!("Ciphertext too short: {} bytes", bytes.len()));
     }
-    
+
     let (nonce_bytes, ciphertext_bytes) = bytes.split_at(NONCE_LENGTH);
-    println!("Nonce (hex): {}", hex::encode(nonce_bytes));
     
-    let nonce = GenericArray::from_slice(nonce_bytes);
-    
-    match cipher.decrypt(nonce, ciphertext_bytes) {
-        Ok(plaintext_bytes) => {
-            println!("Decrypted bytes length: {}", plaintext_bytes.len());
-            String::from_utf8(plaintext_bytes)
-                .map_err(|e| {
-                    println!("UTF-8 error: {}", e);
-                    format!("UTF-8 conversion failed: {}", e)
-                })
-        },
+    let cipher = match Aes256Gcm::new_from_slice(key) {
+        Ok(c) => c,
         Err(e) => {
-            println!("Decryption error: {:?}", e);
+            println!("CIPHER INIT ERROR: {:?}", e);
+            return Err(format!("Cipher initialization failed: {}", e));
+        }
+    };
+
+    match cipher.decrypt(nonce_bytes.into(), ciphertext_bytes) {
+        Ok(plaintext) => String::from_utf8(plaintext)
+            .map_err(|e| format!("UTF-8 conversion failed: {}", e)),
+        Err(e) => {
+            println!("DECRYPTION ERROR DETAIL: {:?}", e);
             Err(format!("Decryption failed: {}", e))
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+ #[test]   
+  fn test_encrypt_decrypt_cycle() -> Result<(), String> {
+      let key = match get_key() {
+          Ok(k) => k,
+          Err(_) => {
+              println!("No ENCRYPTION_KEY found, using test key");
+              let test_key: [u8; 32] = rand::random();
+              test_key.to_vec()
+          }
+      };
+
+      println!("Using key: {}", hex::encode(&key));
+
+      let plaintext = "my_secret_password";
+      println!("Original: {}", plaintext);
+      
+      let encrypted = encrypt_password(plaintext, &key)?;
+      println!("Encrypted: {}", encrypted);
+
+      let decrypted = decrypt_password(&encrypted, &key)?;
+      println!("Decrypted: {}", decrypted);
+
+      if plaintext == decrypted {
+          println!("SUCCESS: Encryption/decryption cycle works!");
+          Ok(())
+      } else {
+          Err("Decrypted text doesn't match original!".into())
+      }
+  }
 }

@@ -1,60 +1,59 @@
-use sqlx::{Pool, Postgres, FromRow, postgres::PgPoolOptions};
+use sqlx::{Pool, Postgres, FromRow, postgres::PgPoolOptions };
 use uuid::Uuid;
 use super::get_account_psql_link::get_account_psql_link;
-use crate::models::pools_models::AccountPools;
 use std::collections::HashMap;
-use crate::helpers::install_extensions::install_extensions;
 use std::sync::{Arc, RwLock};
+use std::time::{Instant, Duration};
+use crate::models::pools_models::{AccountPools, PoolWrapper};
 
-#[derive(FromRow)]
-struct AccountRes {
-  username: String,
-  db_password: String,
-  id: Uuid
+#[derive(FromRow, Clone)]
+pub struct AccountInfo {
+    pub id: Uuid,
+    pub username: String,
+    pub db_password: String,
 }
 
 pub async fn init_all_account_connections(
-    pool: Pool<Postgres>,
-    admin_url: String
-) -> Result<AccountPools, std::io::Error> {
-    dotenv::dotenv().ok();
-
-    let accounts = sqlx::query_as::<_, AccountRes>(
+    admin_pool: Pool<Postgres>,
+) -> Result<AccountPools, sqlx::Error> {
+    // First fetch all account information
+    let accounts = sqlx::query_as::<_, AccountInfo>(
         "SELECT id, username, db_password FROM accounts"
     )
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    .fetch_all(&admin_pool)
+    .await?;
 
-    let account_pools = HashMap::new();
-    let account_pools = Arc::new(RwLock::new(account_pools));
+    // Create all connection pools in advance
+    let mut pools = HashMap::new();
     
     for account in accounts {
-        let postgres_url = std::env::var("POSTGRES_URL")
-            .expect("Postgres URL has not been set for initializing account connections");
-    
-        let _ = install_extensions(&admin_url, &account.username)
-                .await;
-
-        let account_db_url = get_account_psql_link(
-            account.username.clone(), 
-            account.db_password.clone(), 
-            postgres_url
-        );
-
-        let account_pool = PgPoolOptions::new()
-            .max_connections(2)
-            .connect(&account_db_url)
-            .await
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-
-        println!("Connected to {} account pool", account.username);
-
-        // Acquire write lock and insert the new pool
-        account_pools.write()
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to acquire write lock"))?
-            .insert(account.id, account_pool);
+        let pool = create_connection_pool(&account.username, &account.db_password).await?;
+        pools.insert(account.id, PoolWrapper {
+            pool,
+            last_used: Instant::now(),
+        });
     }
+
+    // Now wrap in Arc<RwLock> after all pools are created
+    Ok(AccountPools(Arc::new(RwLock::new(pools))))
+}
+
+async fn create_connection_pool(
+    username: &str,
+    password: &str,
+) -> Result<Pool<Postgres>, sqlx::Error> {
+    let postgres_url = std::env::var("POSTGRES_URL")
+        .expect("POSTGRES_URL must be set");
     
-    Ok(AccountPools(account_pools))
+    let db_url = get_account_psql_link(
+        username.to_string(),
+        password.to_string(),
+        postgres_url
+    );
+
+    PgPoolOptions::new()
+        .max_connections(5)
+        .idle_timeout(Duration::from_secs(300))
+        .connect(&db_url)
+        .await
 }

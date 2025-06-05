@@ -1,6 +1,5 @@
 use actix_web::{HttpResponse, post, web};
 use serde_json;
-use sqlx::{Pool, Postgres};
 use crate::models::generation_models::{DemoPayload};
 use crate::models::pools_models::AccountPools;
 mod add_products_suggestion;
@@ -23,11 +22,19 @@ pub async fn generation_demo (
   // UPDATE THAT DAMN DEMO_ACCOUNT_ID!!
   // YOU KEEP FORGETTING!!!!
 
-  let account_conn: Pool<Postgres> = target_account_pool(user_id_string.clone(), account_pools).unwrap();
-
+  let pool = match target_account_pool(user_id_string.clone(), account_pools).await {
+      Ok(pool) => pool,
+      Err(e) => {
+          return HttpResponse::NotFound().json(serde_json::json!({
+              "status": 404,
+              "error": format!("Database connection failed: {}", e)
+          }))
+      }
+  };  
+  
   let response_with_products = add_products_suggestion(
         req.clone(),
-        account_conn.clone(),
+        pool.clone(),
   )
     .await
     .map_err(|err| {
@@ -42,7 +49,7 @@ pub async fn generation_demo (
     
   let parsed_response = parse_response(
     response_with_products, 
-    account_conn,
+    pool,
     req.selector
   )
     .await

@@ -16,17 +16,14 @@ mod auth;
 async fn main() -> std::io::Result<()>{
     dotenv::dotenv().ok();
     println!("Starting initialization..."); 
-    let env_key = std::env::var("ENCRYPTION_KEY");
-
-    println!("Raw ENCRYPTION_KEY: {:?}", env_key); // Add this line
 
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("CRASH: {}", panic_info);
     }));        
 
-    env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    // env_logger::Builder::from_default_env()
+    //     .filter_level(log::LevelFilter::Info)
+    //     .init();
 
 
     let admin_url = std::env::var("DATABASE_URL")
@@ -35,23 +32,29 @@ async fn main() -> std::io::Result<()>{
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
         .max_connections(10)
-        .acquire_timeout(Duration::from_secs(2))
+        .idle_timeout(Duration::from_secs(300))
+        .acquire_timeout(Duration::from_secs(10))
+        
         .connect(&format!("{}/postgres", &admin_url))
         .await
-        .expect("Error connecting to pool");
+        .map_err(|err| {
+            eprint!("Error connecting to pool: {}", err);
+        }).unwrap();
 
-    let _init_accounts_table = create_accounts_table(admin_pool.clone()).await;
+    create_accounts_table(admin_pool.clone()).await
+        .map_err(|e| std::io::Error::new(
+            std::io::ErrorKind::Other, 
+            format!("Failed to create accounts table: {:?}", e)
+        ))?;
+        
+    let account_pools = init_all_account_connections(admin_pool.clone()).await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-    let account_pools = init_all_account_connections(admin_pool.clone(), admin_url.clone())
-        .await?;
-
-
-    for (_account_id, pool) in account_pools.0.read().unwrap().iter() {
-        let _ = init_pgai(pool.clone()).await;
-}
-    let _preloads_model = preload_model(admin_pool.clone())
-        .await
-        .expect("Couldn't establish connection to LLM Server");
+//     for (_account_id, pool) in account_pools.0.read().unwrap().iter() {
+//         let _ = init_pgai(pool.clone()).await;
+// }
+    preload_model(admin_pool.clone()).await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
     println!("===[ Successfully started ]===");
 
