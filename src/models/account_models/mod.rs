@@ -31,3 +31,10 @@ pub struct Payload {
   pub first_name: String,
   pub last_name: String,
 }
+
+#[derive(FromRow, Clone)]
+pub struct AccountInfo {
+    pub id: Uuid,
+    pub username: String,
+    pub db_password: String,
+}

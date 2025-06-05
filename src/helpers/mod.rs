@@ -1,10 +1,10 @@
 pub mod get_account_psql_link;
 pub mod generate_random_password;
 pub mod to_snake_case;
-pub mod init_all_account_connections;
 pub mod target_pool;
 pub mod modify_types;
 pub mod install_extensions;
 pub mod add_account_to_pools;
 pub mod pool_wrapper;
 pub mod init_account_connection;
+pub mod start_pool_cleanup_task;

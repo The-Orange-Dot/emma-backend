@@ -4,13 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 use crate::helpers::get_account_psql_link::get_account_psql_link;
-
-struct PoolWrapper {
-    pool: Pool<Postgres>,
-    last_used: Instant,
-}
-
-pub struct AccountPools(Arc<RwLock<HashMap<Uuid, PoolWrapper>>>);
+use crate::models::pools_models::{PoolWrapper, AccountPools};
 
 impl AccountPools {
     pub fn new() -> Self {
@@ -23,7 +17,6 @@ impl AccountPools {
         username: &str,
         db_password: &str,
     ) -> Result<Pool<Postgres>, std::io::Error> {
-        // First try to get and update an existing pool
         {
             let mut pools = self.0.write()
                 .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to acquire write lock"))?;
@@ -34,7 +27,6 @@ impl AccountPools {
             }
         }
 
-        // If no pool exists, create a new one
         let postgres_url = std::env::var("POSTGRES_URL")
             .expect("Postgres URL has not been set for initializing account connections");
 
@@ -52,7 +44,6 @@ impl AccountPools {
             .await
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
-        // Insert the new pool
         let mut pools = self.0.write()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to acquire write lock"))?;
         
@@ -67,13 +58,28 @@ impl AccountPools {
     pub fn cleanup_idle_pools(&self, idle_timeout: Duration) {
         let mut pools = match self.0.write() {
             Ok(pools) => pools,
-            Err(_) => return, // Log error in production
+            Err(e) => {
+                log::error!("Failed to acquire write lock for cleanup: {}", e);
+                return;
+            }
         };
 
         let now = Instant::now();
-        pools.retain(|_, wrapper| {
-            // Keep pools that have been used recently
-            now.duration_since(wrapper.last_used) < idle_timeout
+        let before_count = pools.len();
+        
+        pools.retain(|id, wrapper| {
+            let idle_for = now.duration_since(wrapper.last_used);
+            if idle_for >= idle_timeout {
+                log::info!("Cleaning up idle pool for account {} (idle for {:?})", id, idle_for);
+                false
+            } else {
+                true
+            }
         });
+
+        let after_count = pools.len();
+        if before_count != after_count {
+            log::info!("Pool cleanup completed: {} -> {} pools", before_count, after_count);
+        }
     }
 }

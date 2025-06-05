@@ -35,7 +35,6 @@ pub async fn add_account_to_pools(
 
     println!("Connected to {} account pool", username);
 
-    // Create PoolWrapper and insert it
     account_pools.0.write().unwrap().insert(
         account_id,
         PoolWrapper {
