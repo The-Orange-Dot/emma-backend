@@ -73,15 +73,19 @@ pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, store_name: String) -
     );
 
     let current_time = Utc::now();
-    let result = sqlx::query(&query)
+    let result: Result<PgQueryResult, sqlx::Error> = match sqlx::query(&query)
         .bind(current_time)
         .execute(&pool)
         .await
-        .map_err(|err| {
-            eprintln!("Error embedding data on embedding table: {}", err);
-        }).unwrap();
+        {
+            Ok(res) => Ok(res),
+            Err(err) => {
+                eprintln!("Error embedding data on embedding table: {}", err);
+                Err(err)
+            }
+        };
 
-    Ok(result)
+    result
 }
 
 async fn create_embeddings_table(pool: &sqlx::Pool<Postgres>, store_name: &str) -> Result<(), sqlx::Error> {

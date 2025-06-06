@@ -16,7 +16,7 @@ use crate::helpers::start_pool_cleanup_task::start_pool_cleanup_task;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
-    println!("Starting initialization..."); 
+    println!("Starting initialization...");   
 
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("CRASH: {}", panic_info);
@@ -25,7 +25,6 @@ async fn main() -> std::io::Result<()> {
     let admin_url = std::env::var("DATABASE_URL")
         .expect("DATABASE_URL must be set");
 
-    // Initialize admin pool
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
         .max_connections(10)
@@ -55,14 +54,12 @@ async fn main() -> std::io::Result<()> {
     let account_pools = AccountPools::new();
     start_pool_cleanup_task(account_pools.clone(), cleanup_interval, idle_timeout).await;
 
-    // Create accounts table
     create_accounts_table(admin_pool.clone()).await
         .map_err(|e| std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to create accounts table: {:?}", e)
         ))?;
 
-    // Load and initialize all accounts
     let accounts = sqlx::query_as::<_, AccountInfo>(
         "SELECT id, username, db_password FROM accounts"
     )
@@ -83,7 +80,6 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    // Initialize PGAI for each pool
     if let Ok(pools) = account_pools.0.read() {
         for (_account_id, wrapper) in pools.iter() {
             if let Err(e) = init_pgai(wrapper.pool.clone()).await {
@@ -92,7 +88,6 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    // Preload models
     preload_model(admin_pool.clone()).await
         .map_err(|e| std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -101,12 +96,10 @@ async fn main() -> std::io::Result<()> {
 
     println!("===[ Successfully started ]===");
 
-    // Create web::Data wrappers (ONCE, outside HttpServer::new)
     let account_pools_data = web::Data::new(account_pools);
     let admin_pool_data = web::Data::new(AdminPool(admin_pool.clone()));
     let admin_url_data = web::Data::new(admin_url.clone());
 
-    // Start server
     HttpServer::new(move || {
         App::new()
             .wrap(
@@ -119,11 +112,9 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(web::PayloadConfig::default().limit(20 * 1024 * 1024))
             .app_data(web::JsonConfig::default().limit(20 * 1024 * 1024))
-            // Register the data wrappers (no duplicates)
             .app_data(account_pools_data.clone())
             .app_data(admin_pool_data.clone())
             .app_data(admin_url_data.clone())
-            // Register services
             .service(routes::generate_gemma::generate_gemma)
             .service(routes::create_account::create_account)
             .service(routes::create_store::create_store)

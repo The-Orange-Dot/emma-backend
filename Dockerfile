@@ -30,7 +30,7 @@ ENV RUST_LOG=info
 
 EXPOSE 8080
 
-COPY --from=builder /app/target/release/emma-backend .
+COPY --from=builder /app/target/release/emma-backend /app/emma-backend
 
 RUN useradd -m appuser && \
     chown -R appuser:appuser /app
@@ -40,24 +40,6 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD curl -f http://localhost:8080/health || exit 1
 
 CMD ["/app/emma-backend"]
-
-FROM debian:bookworm-slim
-WORKDIR /app
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    iproute2 \
-    ca-certificates && \
-    curl -fsSL https://tailscale.com/install.sh | sh && \
-    rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /app/target/release/emma-backend .
-
-CMD ["sh", "-c", "tailscaled --state=/var/lib/tailscale/tailscaled.state & \
-     sleep 5 && \
-     tailscale up --authkey=${TAILSCALE_AUTHKEY} && \
-     /app/emma-backend"]
 
 # docker build --platform linux/amd64 -t orangedot/emma-backend:v1 .
 

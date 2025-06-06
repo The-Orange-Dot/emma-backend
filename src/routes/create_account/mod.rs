@@ -1,5 +1,7 @@
+use std::time::Duration;
+
 use actix_web::{web, HttpResponse, post};
-use sqlx::{postgres::{PgPoolOptions, PgQueryResult}, Postgres, Transaction, Pool};
+use sqlx::postgres::PgPoolOptions;
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString};
 use argon2::password_hash::rand_core::{OsRng};
@@ -32,6 +34,7 @@ pub async fn create_account(
     let req = payload.into_inner();
     let admin_conn = target_admin_pool(admin_pool);
     let admin_url = admin_url.into_inner();
+    let new_account_uuid = Uuid::new_v4();
 
     let _re = match Regex::new(r"^[a-zA-Z0-9_\s]+$")
     {
@@ -55,90 +58,86 @@ pub async fn create_account(
     let db_password = generate_random_password(24);
     let dashboard_password = req.password;
     
-    let mut transaction: Transaction<'static, Postgres> = admin_conn.begin()
-        .await
-        .expect("Failed to create transaction");
-
+    let mut transaction = match admin_conn.begin().await {
+        Ok(t) => t,
+        Err(err) => {
+            eprintln!("Failed to begin transaction: {}", err);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": 500,
+                "message": "Failed to initiate database operation.",
+                "response": []
+            }));
+        }
+    };
+  
     ensure_store_auth_table(&admin_conn)
     .await
     .expect("Failed to ensure store auth table exists");
 
-    let _create_account_database: Result<PgQueryResult, HttpResponse> = match sqlx::query(&format!("CREATE DATABASE {}", snake_case_name))
+    let create_account_database= sqlx::query(&format!("CREATE DATABASE {}", snake_case_name))
         .execute(&admin_conn)
-        .await
-        {
-            Ok(res) => Ok(res),
-            Err(err) => {
-                eprintln!("Error creating new account's database: {}", err);
-                Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": 500,
-                    "message": "Error creating user account",
-                    "response": []
-                })))
-            }
-        };
+        .await;
 
-    // CHANGE THIS DURING PRODUCTION
+    if let Err(err) = create_account_database {
+        eprintln!("Error creating new account's database: {}", err);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }));
+    }
+
     let key = get_key().expect("Failed to create key");
     let encrypted_db_password = encrypt_password(&db_password, &key)
         .expect("Failed to encrypt password");
 
-    let _created_accout: Result<PgQueryResult, HttpResponse> = match sqlx::query(&format!(
+    let created_accout = sqlx::query(&format!(
         "CREATE USER {} WITH PASSWORD '{}' NOINHERIT NOCREATEDB NOCREATEROLE",
         db_username, &db_password
     ))
     .execute(&mut *transaction)
-    .await
-    {
-        Ok(res) => Ok(res),
-        Err(err) => {
-            eprintln!("Error creating new account: {}", err);
-            drop_table(&snake_case_name, &admin_conn).await;
-            Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "message": "Error creating user account",
-                "response": []
-            })) )                       
-        }
-    };
+    .await;
 
-    let _granted_premissions = match sqlx::query(&format!(
+    if let Err(err) = created_accout {
+        eprintln!("Error creating user with password: {}", err);        
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }));
+    }
+
+    let granted_premissions = sqlx::query(&format!(
         "GRANT ALL PRIVILEGES ON DATABASE {} TO {}",
         snake_case_name, db_username
         ))
         .execute(&mut *transaction)
-        .await
-        {
-            Ok(res) => Ok(res),
-            Err(err) => {
-                eprintln!("Error granting permission {} to database {}: {}", db_username, snake_case_name, err);
-                drop_table(&snake_case_name, &admin_conn).await;                
-                Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": 500,
-                    "message": "Error creating user account",
-                    "response": []
-                })))                   
-            }
-        };
+        .await;
 
-    let _granted_ownership = match sqlx::query(&format!(
+    if let Err(err) = granted_premissions {
+        eprintln!("Error granting privileges for user: {}", err);                
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }));   
+    }
+
+    let granted_ownership = sqlx::query(&format!(
     "ALTER DATABASE {} OWNER TO {}",
     snake_case_name, db_username
     ))
     .execute(&mut *transaction)
-    .await
-    {
-        Ok(res) => Ok(res),
-        Err(err) => {
-            eprintln!("Failed to grant ownership to {} to database {}: {}", db_username, snake_case_name, err);
-            drop_table(&snake_case_name, &admin_conn).await;            
-            Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "message": "Error creating user account",
-                "response": []
-            })))     
-        }
-    };
+    .await;
+
+    if let Err(err) = granted_ownership {
+        eprintln!("Failed granting ownership to user: {}", err);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }));
+    }
 
     let mut rng = OsRng;
     let salt = SaltString::generate(&mut rng);
@@ -148,9 +147,10 @@ pub async fn create_account(
     
     let hashed_password = hashed_password.to_string();
 
-    let _add_account_into_accounts_table = match sqlx::query(
-        "INSERT INTO accounts (username, email, password, first_name, last_name, db_password) VALUES ($1, $2, $3, $4, $5, $6)"
+    let add_account_into_accounts_table = sqlx::query(
+        "INSERT INTO accounts (id, username, email, password, first_name, last_name, db_password) VALUES ($1, $2, $3, $4, $5, $6, $7)"
     )
+    .bind(&new_account_uuid)
     .bind(&snake_case_name)
     .bind(&req.email)
     .bind(hashed_password)
@@ -158,84 +158,111 @@ pub async fn create_account(
     .bind(&req.last_name)
     .bind(&encrypted_db_password)
     .execute(&mut *transaction)
-    .await
-    {
-        Ok(res) => Ok(res),
+    .await;
+
+    if let Err(err) = add_account_into_accounts_table {
+        eprintln!("Failed to add user to accounts table: {}", err);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }))
+    }
+
+    match transaction.commit().await {
+        Ok(res) => res,
         Err(err) => {
-            eprintln!("Failed to add user to accounts table: {}", err);
-            drop_table(&snake_case_name, &admin_conn).await;            
-            Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "message": "Error creating user account",
-                "response": []
-            })))               
+          eprintln!("Transaction failed on admin side: {}", err); 
+          return HttpResponse::InternalServerError().json(serde_json::json!({
+              "status": 500,
+              "message": "Failed to finalize store deletion.",
+              "response": []
+          }))          
         }
-    };
-
-    transaction.commit().await.expect("failed to commit transaction");
-
-    let account_id = match sqlx::query_as::<_, (Uuid,)>(
-        "SELECT id FROM accounts WHERE username = $1"
-    )
-    .bind(&snake_case_name)
-    .fetch_one(&admin_conn)
-    .await
-    {
-        Ok(id) => Ok(id.0),
-        Err(err) => {
-            eprintln!("Failed to get new account id: {}", err);
-            drop_table(&snake_case_name, &admin_conn).await;            
-            Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "message": "Error creating user account",
-                "response": []
-            })))                          
-        }
-    }.unwrap();
-
+    } 
+          
+    // let account_id = match sqlx::query_as::<_, (Uuid,)>(
+    //     "SELECT id FROM accounts WHERE username = $1"
+    // )
+    // .bind(&snake_case_name)
+    // .fetch_one(&mut *transaction)
+    // .await
+    // {
+    //     Ok(res) => {
+    //         res.0 
+    //     },
+    //     Err(sqlx::Error::RowNotFound) => {
+    //         eprintln!("User with email '{}' not found.", &req.email);
+    //         return HttpResponse::Unauthorized().json(serde_json::json!({
+    //             "status": 401,
+    //             "message": "Invalid email or password",
+    //             "response": []
+    //         }));
+    //     },
+    //     Err(err) => {
+    //         eprintln!("Database error while fetching user: {}", err);
+    //         return HttpResponse::InternalServerError().json(serde_json::json!({
+    //             "status": 500,
+    //             "message": "Database error during login.",
+    //             "response": []
+    //         }));
+    //     }
+    // };
 
     let account_db_url = match add_account_to_pools(
         &account_pools,
         &admin_url,
-        account_id,
+        new_account_uuid,
         &db_username,
         &encrypted_db_password,
         database_url
     )
         .await
         {
-            Ok(res) => Ok(res),
-            Err(err) => {
-                eprintln!("Failed to add new pool to account pools: {}", err);
-                drop_table(&snake_case_name, &admin_conn).await;            
-                Err(HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": 500,
-                    "message": "Error creating user account",
-                    "response": []
-                })))                  
-            }
-        }.unwrap();
-            
+            Ok(res) => res,
+            Err(_) => "Error".to_string()   
+        };
+
+    if account_db_url == "Error" {
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Error creating user account",
+            "response": []
+        }));
+    };    
     
-   
+    // NOW USING ACCOUNT'S POOL RATHER THAN ADMIN'S
     let account_conn = match PgPoolOptions::new()
-        .max_connections(2)
+        .max_connections(5)
+        .idle_timeout(Duration::from_secs(300))
+        .test_before_acquire(true)
         .connect(&account_db_url)
         .await
         {
-            Ok(res) => Ok(res),
+            Ok(res) => res,
             Err(err) => {
                 eprintln!("Failed to connect to new account pool: {}", err);
-                drop_table(&snake_case_name, &admin_conn).await;            
-                Err(HttpResponse::InternalServerError().json(serde_json::json!({
+                return HttpResponse::InternalServerError().json(serde_json::json!({
                     "status": 500,
                     "message": "Error creating user account",
                     "response": []
-                })))                  
+                }));                 
             }
-        }.unwrap();
+        };
 
-    let _new_store_table_if_not_created = sqlx::query(
+    let mut new_account_transaction = match account_conn.begin().await {
+        Ok(t) => t,
+        Err(err) => {
+            eprintln!("Failed to begin new account's transaction: {}", err);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": 500,
+                "message": "Failed to initiate database operation.",
+                "response": []
+            }));
+        }
+    };              
+
+    let new_store_table_if_not_created = sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS stores (
             id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -254,13 +281,20 @@ pub async fn create_account(
         )
         "#
     )
-    .execute(&account_conn)
-    .await
-    .map_err(|err| {
-        eprintln!("ERROR CREATING STORES TABLE: {:?}", err)
-    });
+    .execute(&mut *new_account_transaction)
+    .await;
 
-    let _new_store_table_if_not_created = sqlx::query(
+    if let Err(err) = new_store_table_if_not_created {
+        eprintln!("Error creating stores table for user {}: {}", db_username, err);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Failed to initiate database operation.",
+            "response": []
+        }));
+    }
+    
+
+    let new_products_table_if_not_created = sqlx::query(
         r#"
             CREATE TABLE IF NOT EXISTS store_products (
                 store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
@@ -269,31 +303,36 @@ pub async fn create_account(
             );
         "#
     )
-    .execute(&account_conn)
-    .await
-    .map_err(|err| {
-        eprintln!("ERROR CREATING RELATIONSHIPS TABLE: {:?}", err)
-    });
+    .execute(&mut *new_account_transaction)
+    .await;
 
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": 200,
-        "message": "Account created successfully",
-        "response": {
-            "username": &req.username
+    if let Err(err) = new_products_table_if_not_created {
+        eprintln!("Error creating products table for user {}: {}", db_username, err);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": "Failed to initiate database operation.",
+            "response": []
+        }));
+    }    
+
+    match new_account_transaction.commit().await {
+        Ok(_) => {
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": 200,
+                "message": "Account created successfully",
+                "response": {
+                    "username": &req.username
+                },
+            }))            
         },
-    }))
-}
-
-async fn drop_database_connection(snake_case_name: &String, admin_conn: &Pool<Postgres>) {
-    let _ = sqlx::query(&format!("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{}'", snake_case_name))
-        .execute(admin_conn)
-        .await;    
-}
-
-async fn drop_table(snake_case_name: &String, admin_conn: &Pool<Postgres>) {
-    drop_database_connection(&snake_case_name, &admin_conn).await;
-    let _ = sqlx::query(&format!("DROP DATABASE {}", snake_case_name))
-        .execute(admin_conn)
-        .await;
+        Err(err) => {
+            eprintln!("Failed to create new account: {}", err);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": 500,
+                "message": "Failed to finalize store deletion.",
+                "response": []
+            }))            
+        }
+    } 
 }
 

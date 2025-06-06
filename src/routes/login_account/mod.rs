@@ -29,8 +29,6 @@ pub async fn login_account(
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
 
-    // eprintln!("Attempting login with email: '{}'", &req.email);
-
     let found_account = match sqlx::query_as::<_, Account>(
         "SELECT * FROM accounts WHERE LOWER(email) = LOWER($1)"
     )
@@ -38,26 +36,40 @@ pub async fn login_account(
     .fetch_one(&admin_conn)
     .await
     {
-        Ok(res) => Ok(res),
+        Ok(res) => {
+            res 
+        },
+        Err(sqlx::Error::RowNotFound) => {
+            eprintln!("User with email '{}' not found.", &req.email);
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": 401,
+                "message": "Invalid email or password",
+                "response": []
+            }));
+        },
         Err(err) => {
-            eprintln!("Failed to find existing user: {}", err);
-            Err(HttpResponse::Unauthorized().json(serde_json::json!({
-            "status": 401,
-            "message": "Invalid email or password",
-            "response": []
-            })))
+            eprintln!("Database error while fetching user: {}", err);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": 500,
+                "message": "Database error during login.",
+                "response": []
+            }));
         }
-    }.unwrap();
+    };
 
-    let stored_hash = PasswordHash::new(&found_account.password)
-        .map_err(|err| {
-            eprintln!("Failed to parse stored hash: {}", err);
-            HttpResponse::Unauthorized().json(serde_json::json!({
-              "status": 401,
-              "message": "Invalid email or password",
-              "response": []
-            }))
-        }).unwrap();
+
+    let stored_hash = match PasswordHash::new(&found_account.password)
+        {
+            Ok(res) => res,
+            Err(_err) => {
+            eprintln!("Incorrect password for account: {}", &req.email);
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": 401,
+                "message": "Invalid email or password",
+                "response": []
+            }));                
+            }
+        };
 
     let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
 
@@ -120,3 +132,4 @@ pub async fn login_account(
         }
     }
 }
+

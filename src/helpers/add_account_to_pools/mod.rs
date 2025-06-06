@@ -6,6 +6,7 @@ use crate::models::pools_models::AccountPools;
 use uuid::Uuid;
 use sqlx::{postgres::PgPoolOptions};
 use crate::models::pools_models::PoolWrapper;
+use std::time::Duration;
 
 pub async fn add_account_to_pools(
     account_pools: &AccountPools,
@@ -28,7 +29,8 @@ pub async fn add_account_to_pools(
     );
 
     let pool = PgPoolOptions::new()
-        .max_connections(2)
+        .max_connections(5)
+        .idle_timeout(Duration::from_secs(300))        
         .connect(&account_db_url)
         .await
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;

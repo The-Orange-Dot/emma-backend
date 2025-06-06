@@ -1,9 +1,12 @@
 use sqlx::{postgres::PgPoolOptions};
+use std::time::Duration;
 
 pub async fn install_extensions(admin_conn_str: &str, db_name: &str) -> Result<(), sqlx::Error> {
     // Create a short-lived pool for just this DB
     let pool = PgPoolOptions::new()
         .max_connections(1)
+        .test_before_acquire(true)
+        .idle_timeout(Duration::from_secs(10))        
         .connect(&format!("{}/{}", admin_conn_str, db_name))  // Connects to `db_name`
         .await?;
 
