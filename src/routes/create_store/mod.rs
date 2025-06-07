@@ -33,7 +33,19 @@ pub async fn create_store(
                 "error": format!("Invalid token: {:?}", err)
             }));
         }
-    };  
+    };
+
+  let mut transaction = match pool.begin().await {
+      Ok(t) => t,
+      Err(e) => {
+          eprintln!("Failed to begin transaction: {}", e);
+          return HttpResponse::InternalServerError().json(serde_json::json!({
+              "status": 500,
+              "message": "Failed to initiate database operation.",
+              "response": []
+          }));
+      }
+  };      
 
   let Payload {store_name, 
     domain, 
@@ -46,7 +58,7 @@ pub async fn create_store(
   let store_table_name = to_snake_case(&store_name);
   let account_uuid = string_to_uuid(account_id);
   let store_uuid = Uuid::new_v4();
-  let _new_store = sqlx::query(
+  let insert_new_store = sqlx::query(
       "
         INSERT INTO stores (
         id, account_id, store_name, 
@@ -58,27 +70,26 @@ pub async fn create_store(
         ON CONFLICT (store_name, store_table, domain) DO NOTHING;
       "
   )
-  .bind(&store_uuid)
-  .bind(&account_uuid)
-  .bind(&store_name)
-  .bind(&store_table_name)
-  .bind(domain)
-  .bind(&platform)
-  .bind("")
-  .bind(shopify_storefront_store_name)
-  .bind(shopify_storefront_access_token)
-  .execute(&pool)
-  .await
-  .map_err(|err| {
-      println!("{:?}", err);
-      HttpResponse::InternalServerError().json(serde_json::json!({
-          "status": 500,
-          "message": format!("Internal server error: {}", err),
-          "response": []
-      }));
-      actix_web::error::ErrorInternalServerError(format!("Error creating new store: {}.", err))
-  }).unwrap();
+    .bind(&store_uuid)
+    .bind(&account_uuid)
+    .bind(&store_name)
+    .bind(&store_table_name)
+    .bind(domain)
+    .bind(&platform)
+    .bind("")
+    .bind(shopify_storefront_store_name)
+    .bind(shopify_storefront_access_token)
+    .execute(&mut *transaction)
+    .await;
 
+    if let Err(err) = insert_new_store {
+      eprint!("Error inserting new store into stores table: {}", err);
+      return HttpResponse::InternalServerError().json(serde_json::json!({
+          "status": 500,
+          "message": format!("Failed to create store: {}", err),
+          "response": []
+      }));   
+    }
 
 
   // CREATES PRODUCTS TABLE
@@ -107,19 +118,7 @@ pub async fn create_store(
       ", &table_name);
 
   let new_products_table = sqlx::query(&create_new_product_table_query)
-    .execute(&pool)
-    .await;
-
-  let _add_table_to_product_store = sqlx::query(
-    "
-      INSERT INTO store_products (store_id, products_table_name)
-      VALUES ($1, $2)
-      ON CONFLICT (store_id, products_table_name) DO NOTHING;
-    "
-  )
-    .bind(&store_uuid)
-    .bind(&table_name)
-    .execute(&pool)
+    .execute(&mut *transaction)
     .await;
 
   match new_products_table {
@@ -130,6 +129,8 @@ pub async fn create_store(
             .await;
         }
 
+        // ADD SHOPIFY HERE
+
         println!("Product table for '{}' has been created", &store_table_name);
     },
     Err(err) => {
@@ -137,16 +138,47 @@ pub async fn create_store(
     }
   }
 
+  let add_table_to_product_store = sqlx::query(
+    "
+      INSERT INTO store_products (store_id, products_table_name)
+      VALUES ($1, $2)
+      ON CONFLICT (store_id, products_table_name) DO NOTHING;
+    "
+  )
+    .bind(&store_uuid)
+    .bind(&table_name)
+    .execute(&mut *transaction)
+    .await;
+
+  if let Err(err) = add_table_to_product_store {
+    eprintln!("Failed to add table to product_store: {}", err);
+    return HttpResponse::InternalServerError().json(serde_json::json!({
+        "status": 500,
+        "message": "Failed to initiate database operation.",
+        "response": []
+    }));    
+  }
+
   let snake_case_store_name = to_snake_case(&store_name);
 
-
-  HttpResponse::Ok().json(serde_json::json!({
-    "status": 200,
-    "message": "Store created",
-    "response": {
-      "store_name": snake_case_store_name, 
-      "store_id": store_uuid.to_string()
-    }
-  }))
-  
+  match transaction.commit().await {
+      Ok(_) => {
+          HttpResponse::Ok().json(serde_json::json!({
+            "status": 200,
+            "message": "Store created",
+            "response": {
+              "store_name": snake_case_store_name, 
+              "store_id": store_uuid.to_string()
+            }
+          }))
+      }
+      Err(e) => {
+          eprintln!("Failed to commit transaction: {}", e);
+          HttpResponse::InternalServerError().json(serde_json::json!({
+              "status": 500,
+              "message": "Failed to finalize store deletion.",
+              "response": []
+          }))
+      }
+  }  
 }

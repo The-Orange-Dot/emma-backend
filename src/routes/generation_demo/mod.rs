@@ -32,34 +32,39 @@ pub async fn generation_demo (
       }
   };  
   
-  let response_with_products = add_products_suggestion(
+  let response_with_products = match add_products_suggestion(
         req.clone(),
         pool.clone(),
   )
     .await
-    .map_err(|err| {
+    {
+      Ok(res) => res,
+      Err(err) => {
         eprintln!("Error adding products suggestions: {}", err);
-        HttpResponse::InternalServerError().json(serde_json::json!({
+        return HttpResponse::InternalServerError().json(serde_json::json!({
             "status": 500,
             "message": format!("Failed to parse product suggestions: {}", err),
             "response": []
         }))
-    }).unwrap();
+      }
+    };
 
-    
-  let parsed_response = parse_response(
+  let parsed_response = match parse_response(
     response_with_products, 
     pool,
     req.selector
   )
     .await
-    .map_err(|err| {
-        HttpResponse::InternalServerError().json(serde_json::json!({
+    {
+      Ok(res) => res,
+      Err(err) => {
+        return HttpResponse::InternalServerError().json(serde_json::json!({
             "status": 500,
             "message": format!("Failed to parse response: {}", err),
             "response": []
-        }))
-    }).unwrap();
+        }));
+      }
+    };
 
     // println!("{:?}", parsed_response);
 

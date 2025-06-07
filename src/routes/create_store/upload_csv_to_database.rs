@@ -83,7 +83,7 @@ pub async fn upload_csv_to_database(
       table_name
   );
 
-  let _products_added = sqlx::query(&query_str)
+  let products_added = sqlx::query(&query_str)
       .bind(&ids)
       .bind(&names)
       .bind(&created_ats)
@@ -100,12 +100,12 @@ pub async fn upload_csv_to_database(
       .bind(&tags)
       .bind(&store_ids)
       .execute(&account_conn)
-      .await
-      .map_err(|err| {
-          eprintln!("Error adding products into store: {}", err);
-          return sqlx::Error::Protocol("Failed to upload products".into())
-      });
+      .await;
 
+    if let Err(err) = products_added {
+          eprintln!("Error adding products into store: {}", err);
+          return Err(sqlx::Error::Protocol("Failed to upload products".into()))
+    }
 
     Ok(())
 }

@@ -78,7 +78,7 @@ pub async fn add_products_to_store(
         store_name
     );
 
-    let _products_added = sqlx::query(&query_str)
+    let products_added = sqlx::query(&query_str)
       .bind(&ids)
       .bind(&names)
       .bind(&created_ats)
@@ -96,11 +96,16 @@ pub async fn add_products_to_store(
       .bind(&product_urls)
       .bind(&store_ids)
       .execute(&pool)
-      .await
-      .map_err(|err| {
+      .await;
+
+    if let Err(err) = products_added {
           eprintln!("Error adding products into store: {}", err);
-          return sqlx::Error::Protocol("Failed to upload products".into())
-      });
+          return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": 500,
+            "message": format!("Error adding products into store: {}", err),
+            "response": []
+          }));
+    }
 
     HttpResponse::Ok().json(serde_json::json!({
       "status": 200,

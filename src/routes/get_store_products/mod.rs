@@ -28,34 +28,36 @@ pub async fn get_store_products(
         }
     };  
 
-  let query = Query::<RequestQuery>::from_query(req.query_string())
+  let RequestQuery {store_name, cursor} = Query::<RequestQuery>::from_query(req.query_string())
     .unwrap().into_inner();
 
-  let RequestQuery {store_name, cursor} = query;
+  let store_query: String = format!("SELECT * FROM stores WHERE store_table = '{}'", store_name);
+  let store_res = match sqlx::query_as::<_, Store>(&store_query)
+    .fetch_one(&pool)
+    .await {
+      Ok(res) => res,
+
+      Err(err) => {
+        eprint!("Error fetching store: {}", err);
+        return HttpResponse::NoContent().json(serde_json::json!({
+          "status": 204,
+          "message": "Failed to fetch store data",
+          "response": []
+        }))         
+      }
+    };
 
   let products_query = format!(
       "SELECT * FROM {}_products {} ORDER BY id ASC LIMIT 21", 
       &store_name,
       cursor.map(|c| format!("WHERE id > {}", c)).unwrap_or_default()
-  );
-  let res = sqlx::query_as::<_, Product>(&products_query)
+  );    
+
+  let get_all_products = sqlx::query_as::<_, Product>(&products_query)
     .fetch_all(&pool)
-    .await;
+    .await;    
 
-  let store_query: String = format!("SELECT * FROM stores WHERE store_table = '{}'", store_name);
-  let store_res = sqlx::query_as::<_, Store>(&store_query)
-    .fetch_one(&pool)
-    .await
-    .map_err(|err| {
-      eprint!("Error fetching store: {}", err);
-      HttpResponse::NoContent().json(serde_json::json!({
-        "status": 204,
-        "message": "Failed to fetch store data",
-        "response": []
-      })) 
-    }).unwrap();
-
-  match res {
+  match get_all_products {
     Ok(mut data) => {
       let has_more = data.len() > 20;
       if has_more {

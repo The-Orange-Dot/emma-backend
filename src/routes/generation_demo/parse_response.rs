@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use crate::models::{generation_models::Product, store_models::Store};
-use actix_web::{Result};
+use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
 use regex;
 use crate::models::generation_models::ParsedResponse;
@@ -9,7 +9,7 @@ pub async fn parse_response(
     response_with_product_suggestions: String, 
     pool: Pool<Postgres>,
     selector: String
-) -> Result<ParsedResponse, actix_web::Error>{
+) -> Result<ParsedResponse, Error>{
 
     // Parses text to extract text and products wrapped in square brackets
     let re = regex::Regex::new(r"\[(.*?)\]").unwrap();
@@ -32,7 +32,6 @@ pub async fn parse_response(
     let cleaned_response = re.replace_all(&response_with_product_suggestions, "")
         .trim()
         .to_string();
-
 
     let query = format!(
         r#"
@@ -57,7 +56,7 @@ pub async fn parse_response(
         .await
         .map_err(|e| {
             eprintln!("Failed to fetch products: {}", e);
-            actix_web::error::ErrorInternalServerError("Database error")
+            return actix_web::error::ErrorInternalServerError("Database error")
         })?
     } else {
         Vec::new()
@@ -66,15 +65,24 @@ pub async fn parse_response(
     // println!("DEBUG: {:?}", product_rows[0] );
     
     // Fetches store data to send domain to the front
-    let store_data = sqlx::query_as::<_, Store>(
+    let store_data = match sqlx::query_as::<_, Store>(
         "SELECT * FROM stores WHERE store_table = $1"
     )
         .bind(&selector)
         .fetch_one(&pool)
         .await
-        .map_err(|err| {
-            eprint!("Error fetching store domain: {}", err);
-        }).unwrap();
+        {
+            Ok(res) => res,
+            Err(sqlx::Error::RowNotFound) => {
+                eprint!("Store not found");
+                
+                return Err(actix_web::error::ErrorNotFound(format!("No stores have been found")));
+            }
+            Err(err) => {
+                eprint!("Internal Error finding table");
+                return Err(actix_web::error::ErrorInternalServerError(format!("Failed to find store: {}", err)));
+            }    
+        };
 
     // println!("DEBUG: {:?}", store_data);
 
@@ -88,12 +96,14 @@ pub async fn parse_response(
         }
     }
 
-
     // Converts products vector to a valid json array for frontend 
-    let json_response = serde_json::to_value(&unique_products).map_err(|_| {
-        actix_web::error::ErrorInternalServerError("Failed to serialize products")
-    })?;
-    // println!("DEBUG: {:?}", json_response[0]["product_url"]);
+    let json_response = match serde_json::to_value(&unique_products)
+    {
+        Ok(res) => res,
+        Err(err) => {
+            return Err(actix_web::error::ErrorInternalServerError(format!("Failed to serialize products: {}", err)))
+        }
+    };
 
     Ok(ParsedResponse {
         text: cleaned_response,
