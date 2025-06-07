@@ -43,7 +43,7 @@ pub async fn generation_demo (
         eprintln!("Error adding products suggestions: {}", err);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "status": 500,
-            "message": format!("Failed to parse product suggestions: {}", err),
+            "message": format!("{}", err),
             "response": []
         }))
       }
@@ -60,7 +60,7 @@ pub async fn generation_demo (
       Err(err) => {
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "status": 500,
-            "message": format!("Failed to parse response: {}", err),
+            "message": format!("{}", err),
             "response": []
         }));
       }

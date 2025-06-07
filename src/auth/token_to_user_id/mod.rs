@@ -20,8 +20,6 @@ fn logout() -> HttpResponse {
 
 pub fn token_to_uuid(req: HttpRequest) -> Result<Uuid, HttpResponse> {
 
-    
-
    let auth_header = req.headers().get("Authorization")
         .and_then(|h| h.to_str().ok());
     

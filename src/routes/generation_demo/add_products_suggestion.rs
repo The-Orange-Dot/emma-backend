@@ -1,6 +1,8 @@
 use actix_web::{Result, Error};
 use sqlx::{Pool, Postgres};
 use crate::models::{generation_models::DemoPayload, store_models::Store};
+use tokio::time::timeout;
+use std::time::Duration;
 
 pub async fn add_products_suggestion(
     req: DemoPayload,
@@ -112,12 +114,19 @@ pub async fn add_products_suggestion(
         image_params
     );
 
-    let response = sqlx::query_scalar::<_, String>(&query)
+    let query_future = sqlx::query_scalar::<_, String>(&query)
         .bind(req.prompt)
-        .fetch_one(&pool)
+        .fetch_one(&pool);
+
+
+    let response = timeout(Duration::from_secs(30), query_future)
         .await
+        .map_err(|_| {
+            eprintln!("Database query timed out after 10 seconds.");
+            actix_web::error::ErrorRequestTimeout("Database query timed out")
+        })?
         .map_err(|err| {
-            eprintln!("Database error: {:?}", err, );
+            eprintln!("Database error: {:?}", err);
             actix_web::error::ErrorInternalServerError("Failed to generate product suggestions")
         })?;
 

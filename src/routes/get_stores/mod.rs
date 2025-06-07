@@ -12,6 +12,7 @@ pub async fn get_stores(
     let (_account_id, pool) = match init_account_connection(req, account_pools).await {
         Ok(res) => res,
         Err(err) => {
+            println!("Failed to initialize account connection: {:?}", err);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "status": 400,
                 "error": format!("Invalid token: {:?}", err)
