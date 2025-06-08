@@ -5,15 +5,15 @@ use crate::helpers::init_account_connection::init_account_connection;
 
 #[derive(Serialize, Deserialize)]
 struct ReqPayload {
-    store_id: String,
     sys_prompt: String
 }
 
-#[put("/store/emma")]
+#[put("/store/{store_id}/emma")]
 pub async fn update_store_sys_prompt(
     account_pools: web::Data<AccountPools>,
     payload: web::Json<ReqPayload>,
-    req: HttpRequest
+    req: HttpRequest,
+    path: web::Path<String>
 ) ->  HttpResponse{
 
   let (_account_id, pool) = match init_account_connection(req, account_pools).await {
@@ -26,8 +26,8 @@ pub async fn update_store_sys_prompt(
       }
   }; 
 
-  let ReqPayload {store_id, sys_prompt}  = payload.into_inner();
-  let store_uuid = string_to_uuid(store_id.clone());
+  let ReqPayload {sys_prompt}  = payload.into_inner();
+  let store_uuid = string_to_uuid(path.into_inner());
   let result = sqlx::query(
       r#"
           UPDATE stores 

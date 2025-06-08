@@ -13,7 +13,7 @@ struct RequestQuery {
   cursor: Option<i32> 
 }
 
-#[get("/store")]
+#[get("/store/products")]
 pub async fn get_store_products(
   account_pools: web::Data<AccountPools>,
   req: HttpRequest
@@ -31,12 +31,11 @@ pub async fn get_store_products(
   let RequestQuery {store_name, cursor} = Query::<RequestQuery>::from_query(req.query_string())
     .unwrap().into_inner();
 
-  let store_query: String = format!("SELECT * FROM stores WHERE store_table = '{}'", store_name);
-  let store_res = match sqlx::query_as::<_, Store>(&store_query)
+  let store_res = match sqlx::query_as::<_, Store>("SELECT * FROM stores WHERE store_table = $1")
+    .bind(&store_name)
     .fetch_one(&pool)
     .await {
       Ok(res) => res,
-
       Err(err) => {
         eprint!("Error fetching store: {}", err);
         return HttpResponse::NoContent().json(serde_json::json!({
