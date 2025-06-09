@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, post, web};
+use actix_web::{post, web, HttpResponse};
 use serde_json;
 use crate::models::generation_models::{DemoPayload};
 use crate::models::pools_models::AccountPools;
@@ -15,25 +15,27 @@ pub async fn generation_demo (
 ) -> HttpResponse  {
 
   dotenv::dotenv().ok();
-  let user_id_string: String = std::env::var("DEMO_ACCOUNT_ID").expect("No id");
-  let req = payload.into_inner();
+  let payload = payload.into_inner();
 
   // DID YOU FLUSH THE DATABASE?
   // UPDATE THAT DAMN DEMO_ACCOUNT_ID!!
   // YOU KEEP FORGETTING!!!!
 
-  let pool = match target_account_pool(user_id_string.clone(), account_pools).await {
+  let account_id: String = std::env::var("DEMO_ACCOUNT_ID").expect("No id");
+
+  let pool = match target_account_pool(account_id.clone(), account_pools).await {
       Ok(pool) => pool,
-      Err(e) => {
+      Err(err) => {
+          println!("Failed to connect to user pool: {:?}", err);
           return HttpResponse::NotFound().json(serde_json::json!({
               "status": 404,
-              "error": format!("Database connection failed: {}", e)
+              "error": format!("Database connection failed: {}", err)
           }))
       }
-  };  
+  };       
   
   let response_with_products = match add_products_suggestion(
-        req.clone(),
+        payload.clone(),
         pool.clone(),
   )
     .await
@@ -52,7 +54,7 @@ pub async fn generation_demo (
   let parsed_response = match parse_response(
     response_with_products, 
     pool,
-    req.selector
+    payload.selector
   )
     .await
     {
