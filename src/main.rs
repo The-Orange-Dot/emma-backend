@@ -137,7 +137,6 @@ async fn main() -> std::io::Result<()> {
             .wrap(
                 Cors::default()
                     .allowed_origin("https://meetemma.ai")
-                    .allowed_origin("http://100.74.191.99:3000")
                     .allowed_origin("https://localhost:3000") 
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
                     .allow_any_header()
