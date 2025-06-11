@@ -27,6 +27,14 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV RUST_LOG=info
+ENV SERVER_URL=http://100.79.35.30:11434/api/generate
+ENV DATABASE_URL=postgres://postgres:WfkropE5AonK6grsHndmcVAgrNswE8Tt@100.100.140.27:5432
+ENV POSTGRES_URL=100.100.140.27:5432
+ENV LLM_MODEL=gemma3:12b
+ENV POOL_CLEANUP_INTERVAL_SECS=300   
+ENV POOL_IDLE_TIMEOUT_SECS=1800       
+ENV DEMO_ACCOUNT_ID=fa1fe6d9-beae-45be-80da-aad89b147ea0
+ENV APP_ENV=production
 
 EXPOSE 8080
 
@@ -43,13 +51,3 @@ HEALTHCHECK --interval=30s --timeout=3s \
   CMD curl -f http://localhost:8080/health || exit 1
 
 CMD ["/app/emma-backend"]
-
-# docker build --platform linux/amd64 -t orangedot/emma-backend:v1 .
-
-# docker run -it --rm \
-#   --privileged \
-#   --cap-add=NET_ADMIN \
-#   -v /dev/net/tun:/dev/net/tun \
-#   -e TAILSCALE_AUTHKEY=tskey-auth-kK6S4MagTj11CNTRL-fD9AqG7uwve5FZCWruxoveRymzFitrmc \
-#   -e DATABASE_URL=postgres://postgres:WfkropE5AonK6grsHndmcVAgrNswE8Tt@100.100.140.27:5432 \
-#   orangedot/emma-backend:v1
