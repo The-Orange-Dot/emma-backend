@@ -22,7 +22,7 @@ pub async fn attach_embed_data_checker(pool: sqlx::Pool<Postgres>, timer: u64, s
                     Ok(res)
                 },
                 Err(e) => {
-                    // println!("[DEBUG] Update error: {:?}", e);
+                    println!("[DEBUG] Update error: {:?}", e);
                     println!("Cannot find table {}", store_name);
                     Err(backoff::Error::transient(e))
                 }

@@ -4,6 +4,7 @@ use chrono::Utc;
 pub async fn update_embed_data(pool: sqlx::Pool<Postgres>, store_name: String) -> Result<PgQueryResult, sqlx::Error> {
     // First, ensure the embeddings table exists
     create_embeddings_table(&pool, &store_name).await?;
+
     
     let query = format!(
         "
@@ -93,8 +94,8 @@ async fn create_embeddings_table(pool: &sqlx::Pool<Postgres>, store_name: &str) 
     let query = format!(
         "CREATE TABLE IF NOT EXISTS {}_embeddings (
             id BIGSERIAL PRIMARY KEY,
-            product_id INTEGER NOT NULL REFERENCES {}_products(id),
-            chunk_index INTEGER NOT NULL,
+            product_id NUMERIC NOT NULL REFERENCES {}_products(id),
+            chunk_index NUMERIC NOT NULL,
             chunk_text TEXT NOT NULL,
             embedding VECTOR(768) NOT NULL,
             created_at TIMESTAMP WITH TIME ZONE NOT NULL,

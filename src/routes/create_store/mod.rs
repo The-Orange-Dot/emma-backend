@@ -120,7 +120,7 @@ pub async fn create_store(
           let _upload_from_csv = upload_csv_to_database(&mut *transaction, csv.clone(), store_table_name.clone(), store_uuid)
               .await;
         } else if platform == "shopify" {
-          let upload_from_shopify = upload_shopify_to_database(
+          let _upload_from_shopify = upload_shopify_to_database(
             &mut *transaction, 
             shopify_storefront_access_token, 
             shopify_storefront_store_name, 
