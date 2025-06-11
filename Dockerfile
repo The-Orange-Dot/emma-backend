@@ -18,6 +18,8 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 RUN apt-get update && \
@@ -28,7 +30,6 @@ RUN apt-get update && \
 
 ENV RUST_LOG=info
 ENV SERVER_URL=http://100.79.35.30:11434/api/generate
-ENV DATABASE_URL=postgres://postgres:WfkropE5AonK6grsHndmcVAgrNswE8Tt@100.100.140.27:5432
 ENV POSTGRES_URL=100.100.140.27:5432
 ENV LLM_MODEL=gemma3:12b
 ENV POOL_CLEANUP_INTERVAL_SECS=300   
