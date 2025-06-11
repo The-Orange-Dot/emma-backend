@@ -53,7 +53,7 @@ RUN useradd -m appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
   CMD curl -f http://localhost:8080/health || exit 1
 
 CMD ["/app/emma-backend"]
