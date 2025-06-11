@@ -32,16 +32,6 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-ENV RUST_LOG=info
-ENV SERVER_URL=http://100.79.35.30:11434/api/generate
-ENV POSTGRES_URL=100.100.140.27:5432
-ENV LLM_MODEL=gemma3:12b
-ENV POOL_CLEANUP_INTERVAL_SECS=300   
-ENV POOL_IDLE_TIMEOUT_SECS=1800       
-ENV DEMO_ACCOUNT_ID=fa1fe6d9-beae-45be-80da-aad89b147ea0
-ENV APP_ENV=production
-ENV DATABASE_URL=postgres://postgres:WfkropE5AonK6grsHndmcVAgrNswE8Tt@100.100.140.27:5432
-
 EXPOSE 8080
 
 COPY --from=builder /app/target/release/emma-backend /app/emma-backend
