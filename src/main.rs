@@ -12,45 +12,43 @@ mod auth;
 use crate::models::account_models::AccountInfo;
 use crate::helpers::start_pool_cleanup_task::start_pool_cleanup_task;
 
-use rustls::ServerConfig;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls_pemfile::{certs, pkcs8_private_keys};
-use std::io::{BufReader, Error as IoError, ErrorKind as IoErrorKind};
+use std::io::BufReader;
 use std::fs::File;
-
-// THIS IS NEEDED FOR COOKIES FOR LOCAL DEV -> BE SURE TO USE HTTPS!!
-fn load_rustls_config() -> Result<ServerConfig, IoError> {
-    let cert_file = &mut BufReader::new(File::open("cert.pem")?);
-    let key_file = &mut BufReader::new(File::open("key.pem")?);
-
-    let cert_chain: Vec<CertificateDer<'static>> = certs(cert_file)
-        .collect::<Result<Vec<CertificateDer<'static>>, IoError>>()?;
-
-    let mut keys: Vec<PrivateKeyDer<'static>> = pkcs8_private_keys(key_file)
-        .map(|r| r.map(PrivateKeyDer::Pkcs8))
-        .collect::<Result<Vec<PrivateKeyDer<'static>>, IoError>>()?;
-
-    if cert_chain.is_empty() {
-        return Err(IoError::new(IoErrorKind::NotFound, "No certificates found in cert.pem"));
-    }
-    if keys.is_empty() {
-        return Err(IoError::new(IoErrorKind::NotFound, "No private keys found in key.pem"));
-    }
-
-    let config = ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(cert_chain, keys.remove(0))
-        .map_err(|e| IoError::new(IoErrorKind::Other, format!("Failed to load TLS config: {}", e)))?;
-
-    Ok(config)
-}
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let _ = load_rustls_config();
-
     dotenv::dotenv().ok();
     println!("Starting initialization...");   
+
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .unwrap();
+
+    let (cert_path, key_path) = if std::env::var("APP_ENV") == Ok("development".to_string()) {
+        println!("Working with dev-cert and dev-key");
+        ("dev-cert.pem", "dev-key.pem")
+    } else {
+        ("cert.pem", "key.pem")
+    };
+
+    let mut certs_file = BufReader::new(File::open(cert_path).unwrap());
+    let mut key_file = BufReader::new(File::open(key_path).unwrap());
+
+    // load TLS certs and key
+    // to create a self-signed temporary cert for testing:
+    // `openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'`
+    let tls_certs = rustls_pemfile::certs(&mut certs_file)
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    let tls_key = rustls_pemfile::pkcs8_private_keys(&mut key_file)
+        .next()
+        .unwrap()
+        .unwrap();
+
+    let tls_config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(tls_certs, rustls::pki_types::PrivateKeyDer::Pkcs8(tls_key))
+        .unwrap();
 
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("CRASH: {}", panic_info);
@@ -166,9 +164,8 @@ async fn main() -> std::io::Result<()> {
             .service(routes::add_products_to_store::add_products_to_store)
             .service(routes::embed_table::embed_table)
             .service(routes::refresh_token::refresh_token)
-
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind_rustls_0_23(("0.0.0.0", 8080), tls_config)?
     .run()
     .await
 }

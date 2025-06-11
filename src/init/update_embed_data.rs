@@ -92,7 +92,7 @@ async fn create_embeddings_table(pool: &sqlx::Pool<Postgres>, store_name: &str) 
 
     let query = format!(
         "CREATE TABLE IF NOT EXISTS {}_embeddings (
-            id SERIAL PRIMARY KEY,
+            id BIGSERIAL PRIMARY KEY,
             product_id INTEGER NOT NULL REFERENCES {}_products(id),
             chunk_index INTEGER NOT NULL,
             chunk_text TEXT NOT NULL,

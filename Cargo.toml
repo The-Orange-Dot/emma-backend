@@ -16,7 +16,7 @@ futures = "0.3.31"
 validator = { version = "0.20.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 uuid = {version = "1.16.0", features = ["v4", "serde"]}
-actix-web = "4.11.0"
+actix-web = { version = "4.11.0", features = ["macros", "rustls-0_23"]}
 reqwest = { version = "0.12.18", features = ["blocking", "json"]}
 base64 = "0.22.1"
 image = "0.25.6"
@@ -38,4 +38,4 @@ log = "0.4.27"
 hex = "0.4.3"
 dashmap = "6.1.0"
 rustls-pemfile = "2.2.0"
-rustls = "0.23.27"
+rustls = "0.23"

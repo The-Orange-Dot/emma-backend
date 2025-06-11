@@ -22,8 +22,8 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         Err(e) => {
             eprintln!("Invalid refresh token during refresh: {:?}", e);
             return HttpResponse::Unauthorized()
-                .cookie(Cookie::build("access_token", "").max_age(Duration::new(0,0)).path("/").secure(true).http_only(true).same_site(SameSite::None).domain("localhost").finish())
-                .cookie(Cookie::build("refresh_token", "").max_age(Duration::new(0,0)).path("/refresh").secure(true).http_only(true).same_site(SameSite::None).domain("localhost").finish())
+                .cookie(Cookie::build("access_token", "").max_age(Duration::new(0,0)).path("/").secure(true).http_only(true).same_site(SameSite::None).finish())
+                .cookie(Cookie::build("refresh_token", "").max_age(Duration::new(0,0)).path("/refresh").secure(true).http_only(true).same_site(SameSite::None).finish())
                 .json(json!({
                     "status": 401,
                     "message": "Invalid or expired refresh token. Please log in again.",
