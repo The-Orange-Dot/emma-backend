@@ -46,8 +46,8 @@ EXPOSE 8080
 
 COPY --from=builder /app/target/release/emma-backend /app/emma-backend
 
-COPY cert.pem /app/cert.pem
-COPY key.pem /app/key.pem
+# COPY cert.pem /app/cert.pem
+# COPY key.pem /app/key.pem
 
 RUN useradd -m appuser && \
     chown -R appuser:appuser /app
