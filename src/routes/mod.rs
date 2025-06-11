@@ -13,3 +13,4 @@ pub mod generation_demo;
 pub mod add_products_to_store;
 pub mod embed_table;
 pub mod refresh_token;
+pub mod health_check;

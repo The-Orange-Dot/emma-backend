@@ -164,6 +164,7 @@ async fn main() -> std::io::Result<()> {
             .service(routes::add_products_to_store::add_products_to_store)
             .service(routes::embed_table::embed_table)
             .service(routes::refresh_token::refresh_token)
+            .service(routes::health_check::health_check) // GET
     })
     // .bind_rustls_0_23(("0.0.0.0", 8080), tls_config)?
     .bind(("0.0.0.0", 8080))?
