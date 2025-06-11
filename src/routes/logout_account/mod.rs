@@ -1,17 +1,34 @@
-use actix_web::{post, HttpResponse, Responder, cookie::{Cookie, time::Duration},};
+use actix_web::{
+    HttpResponse,
+    post,
+    cookie::{Cookie, time::Duration, SameSite}
+};
 
 #[post("/logout")]
-pub async fn logout_account() -> impl Responder {
-    HttpResponse::Ok()
+pub async fn logout_account() -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Ok()
         .cookie(
-            Cookie::build("jwt", "") 
+            Cookie::build("access_token", "") 
+                .http_only(true)
+                .secure(true)
+                .same_site(SameSite::None)
                 .path("/")
-                .max_age(Duration::seconds(0)) 
+                .domain("localhost") 
+                .max_age(Duration::new(0, 0)) 
+                .finish()
+        )
+        .cookie(
+            Cookie::build("refresh_token", "") 
+                .http_only(true)
+                .secure(true)
+                .same_site(SameSite::None)
+                .path("/refresh") 
+                .domain("localhost") 
+                .max_age(Duration::new(0, 0))
                 .finish()
         )
         .json(serde_json::json!({
-            "status": 200, 
-            "message": "User has logged out",
-            "response": []
-        }))
+            "status": 200,
+            "message": "Successfully logged out!"
+        })))
 }

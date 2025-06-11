@@ -2,6 +2,7 @@ use actix_web::{
   HttpResponse, 
   web, 
   post, 
+  Result,
   cookie::{Cookie, time::Duration, SameSite}
 };
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use crate::{
 };
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use crate::auth;
+use actix_web::error::{ErrorInternalServerError, ErrorUnauthorized};
 
 #[derive(Deserialize, Serialize)]
 struct LoginPayload {
@@ -22,7 +24,7 @@ struct LoginPayload {
 pub async fn login_account(
     payload: web::Json<LoginPayload>,
     admin_pool: web::Data<AdminPool>,
-) -> HttpResponse {
+) -> Result<HttpResponse, actix_web::Error> {
     let req = payload.into_inner();
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
@@ -35,39 +37,26 @@ pub async fn login_account(
     .await
     {
         Ok(res) => {
-            res 
+            Ok(res )
         },
         Err(sqlx::Error::RowNotFound) => {
             eprintln!("User with email '{}' not found.", &req.email);
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": 401,
-                "message": "Invalid email or password",
-                "response": []
-            }));
+            Err(ErrorUnauthorized("Invalid email or password"))
         },
         Err(err) => {
             eprintln!("Database error while fetching user: {}", err);
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "message": "Database error during login.",
-                "response": []
-            }));
+           Err(ErrorInternalServerError("Database error during login."))
         }
-    };
-
+    }?;
 
     let stored_hash = match PasswordHash::new(&found_account.password)
         {
-            Ok(res) => res,
+            Ok(res) => Ok(res),
             Err(_err) => {
             eprintln!("Incorrect password for account: {}", &req.email);
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": 401,
-                "message": "Invalid email or password",
-                "response": []
-            }));                
+            Err(ErrorUnauthorized("Invalid email or password"))               
             }
-        };
+        }?;
 
     let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
 
@@ -88,46 +77,43 @@ pub async fn login_account(
               "username": found_account.username
             });
 
-            let token = auth::create_jwt(&found_account.id.to_string())
-                .expect("failed to create JWT token");
+            let (access_token, refresh_token) = auth::generate_new_tokens(&found_account.id)
+                .map_err(|e| {
+                    eprintln!("Failed to generate JWT tokens: {:?}", e);
+                    ErrorInternalServerError("Failed to create user session")
+                })?;
 
-            HttpResponse::Ok()
+            Ok(HttpResponse::Ok()
                 .cookie(
-                    Cookie::build("jwt", &token)
+                    Cookie::build("access_token", &access_token)
                         .http_only(true)
-                        // .secure(true)
-                        .same_site(SameSite::Lax)
+                        .secure(true)
+                        .same_site(SameSite::None)
                         .path("/")
+                        .domain("localhost") 
+                        .max_age(Duration::minutes(60))
+                        .finish()
+                )
+                .cookie(
+                    Cookie::build("refresh_token", &refresh_token)
+                        .http_only(true)
+                        .secure(true)                       
+                        .same_site(SameSite::None)
+                        .path("/refresh")
+                        .domain("localhost")
                         .max_age(Duration::days(30))
                         .finish()
                 )
                 .json(serde_json::json!({
-                  "status": 200,
-                  "message": "Successfully logged in!",
-                  "token": token,
-                  "response": {"user": account_res}
-              
-            }))
+                "status": 200,
+                "message": "Successfully logged in!",
+                "response": {"user": account_res}
+            })))
         }
         Err(err) => {
-            match err {
-                argon2::password_hash::Error::Password => {
-                    return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": 401,
-                    "message": "Invalid email or password",
-                    "response": []
-                    }))
-                }
-                _ => {
-                    eprintln!("Password verification error: {}", err);
-                    return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": 500,
-                    "message": "Invalid email or password",
-                    "response": []
-                    }))                    
-                }
-            };
-        }
+            eprintln!("Password verification error: {}", err);
+            Err(ErrorUnauthorized("Invalid email or password"))          
+        }            
     }
 }
 

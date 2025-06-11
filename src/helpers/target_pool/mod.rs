@@ -3,8 +3,6 @@ use sqlx::{Pool, Postgres};
 use uuid::Uuid;
 use crate::models::pools_models::{AccountPools, AdminPool};
 
-// First, let's properly define our PoolWrapper and AccountPools
-
 pub async fn target_account_pool(
     account_id: String,
     account_pools: web::Data<AccountPools>,

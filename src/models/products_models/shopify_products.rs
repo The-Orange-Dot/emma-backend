@@ -16,7 +16,7 @@ pub struct Products {
     pub nodes: Vec<Product>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Product {
     pub id: String,
     pub title: String,
@@ -53,24 +53,24 @@ pub struct Product {
     pub available_for_sale: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FeaturedImage {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Seo {
     pub description: Option<String>,
     pub title: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PriceRange {
     #[serde(rename = "minVariantPrice")]
     pub min_variant_price: Money,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Money {
     pub amount: String,
     #[serde(rename = "currencyCode")]

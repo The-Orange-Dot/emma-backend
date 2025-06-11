@@ -1,4 +1,4 @@
-use sqlx::{Pool, Postgres};
+use sqlx::{PgConnection};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
@@ -26,7 +26,7 @@ pub struct CSV {
 }
 
 pub async fn upload_csv_to_database(
-  account_conn: Pool<Postgres>,
+  transaction: &mut PgConnection,
   products: Vec<CSV>,
   table_name: String,
   store_id: Uuid
@@ -99,7 +99,7 @@ pub async fn upload_csv_to_database(
       .bind(&statuses)
       .bind(&tags)
       .bind(&store_ids)
-      .execute(&account_conn)
+      .execute(transaction)
       .await;
 
     if let Err(err) = products_added {

@@ -1,7 +1,6 @@
 use actix_web::{HttpServer, App, web};
 mod routes;
 mod models;
-mod middleware;
 use sqlx::postgres::PgPoolOptions;
 mod init;
 use init::{preload_model::preload_model, init_pgai, create_accounts_table::create_accounts_table};
@@ -13,8 +12,43 @@ mod auth;
 use crate::models::account_models::AccountInfo;
 use crate::helpers::start_pool_cleanup_task::start_pool_cleanup_task;
 
+use rustls::ServerConfig;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls_pemfile::{certs, pkcs8_private_keys};
+use std::io::{BufReader, Error as IoError, ErrorKind as IoErrorKind};
+use std::fs::File;
+
+// THIS IS NEEDED FOR COOKIES FOR LOCAL DEV -> BE SURE TO USE HTTPS!!
+fn load_rustls_config() -> Result<ServerConfig, IoError> {
+    let cert_file = &mut BufReader::new(File::open("cert.pem")?);
+    let key_file = &mut BufReader::new(File::open("key.pem")?);
+
+    let cert_chain: Vec<CertificateDer<'static>> = certs(cert_file)
+        .collect::<Result<Vec<CertificateDer<'static>>, IoError>>()?;
+
+    let mut keys: Vec<PrivateKeyDer<'static>> = pkcs8_private_keys(key_file)
+        .map(|r| r.map(PrivateKeyDer::Pkcs8))
+        .collect::<Result<Vec<PrivateKeyDer<'static>>, IoError>>()?;
+
+    if cert_chain.is_empty() {
+        return Err(IoError::new(IoErrorKind::NotFound, "No certificates found in cert.pem"));
+    }
+    if keys.is_empty() {
+        return Err(IoError::new(IoErrorKind::NotFound, "No private keys found in key.pem"));
+    }
+
+    let config = ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(cert_chain, keys.remove(0))
+        .map_err(|e| IoError::new(IoErrorKind::Other, format!("Failed to load TLS config: {}", e)))?;
+
+    Ok(config)
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    let _ = load_rustls_config();
+
     dotenv::dotenv().ok();
     println!("Starting initialization...");   
 
@@ -104,31 +138,35 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(
                 Cors::default()
-                    .allowed_origin("http://100.74.191.99:3000")
-                    .allowed_origin("http://localhost:3000")
-                    .allowed_methods(["POST", "DELETE", "GET", "PUT"])
+                    .allowed_origin("https://100.74.191.99:3000")
+                    .allowed_origin("https://192.168.1.240:3000")
+                    .allowed_origin("https://localhost:3000") 
+                    .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
                     .allow_any_header()
-                    .supports_credentials()
+                    .supports_credentials() 
+                    .max_age(3600)
             )
             .app_data(web::PayloadConfig::default().limit(20 * 1024 * 1024))
             .app_data(web::JsonConfig::default().limit(20 * 1024 * 1024))
             .app_data(account_pools_data.clone())
             .app_data(admin_pool_data.clone())
             .app_data(admin_url_data.clone())
-            .service(routes::generate_gemma::generate_gemma)
-            .service(routes::create_account::create_account)
+            // .service(routes::generate_gemma::generate_gemma)
+            // .service(routes::create_account::create_account)
             .service(routes::create_store::create_store)
             .service(routes::update_store_sys_prompt::update_store_sys_prompt)
             .service(routes::get_stores::get_stores)
             .service(routes::delete_store::delete_store)
             .service(routes::login_account::login_account)
-            .service(routes::update_products::update_products)
+            // .service(routes::update_products::update_products)
             .service(routes::logout_account::logout_account)
             .service(routes::me::me)
             .service(routes::get_store_products::get_store_products)
             .service(routes::generation_demo::generation_demo)
             .service(routes::add_products_to_store::add_products_to_store)
             .service(routes::embed_table::embed_table)
+            .service(routes::refresh_token::refresh_token)
+
     })
     .bind(("0.0.0.0", 8080))?
     .run()

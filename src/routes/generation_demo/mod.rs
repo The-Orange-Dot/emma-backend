@@ -14,12 +14,12 @@ pub async fn generation_demo (
   account_pools: web::Data<AccountPools>,
 ) -> HttpResponse  {
 
-  dotenv::dotenv().ok();
-  let payload = payload.into_inner();
-
   // DID YOU FLUSH THE DATABASE?
   // UPDATE THAT DAMN DEMO_ACCOUNT_ID!!
   // YOU KEEP FORGETTING!!!!
+
+  dotenv::dotenv().ok();
+  let payload = payload.into_inner();
 
   let account_id: String = std::env::var("DEMO_ACCOUNT_ID").expect("No id");
 
@@ -67,8 +67,6 @@ pub async fn generation_demo (
         }));
       }
     };
-
-    // println!("{:?}", parsed_response);
 
   HttpResponse::Ok().json(serde_json::json!({
       "status": 200,

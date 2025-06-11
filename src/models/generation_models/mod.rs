@@ -15,13 +15,6 @@ pub struct Product {
     pub product_url: String
 }
 
-#[derive(Deserialize)]
-pub struct Payload {
-    pub prompt: String,
-    pub images: Vec<ImageData>, 
-    pub system_prompt: Option<String>
-}
-
 #[derive(Deserialize, Clone, Debug)]
 pub struct DemoPayload {
     pub prompt: String,

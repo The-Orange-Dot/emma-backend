@@ -1,6 +1,8 @@
 use bigdecimal::BigDecimal;
 use sqlx;
-use actix_web::{post, web,  HttpRequest, HttpResponse,};
+use actix_web::{post, web,  HttpRequest, HttpResponse,
+    error::{ErrorInternalServerError, ErrorBadRequest}
+};
 use crate::models::products_models::Product;
 use crate::models::pools_models::{AccountPools};
 use serde::{Deserialize, Serialize};
@@ -19,20 +21,17 @@ pub async fn add_products_to_store(
     account_pools: web::Data<AccountPools>,
     payload: web::Json<Payload>,
     req: HttpRequest,
-) -> HttpResponse{
-    let (_account_id, pool) = match init_account_connection(req, account_pools).await {
-        Ok(res) => res,
-        Err(err) => {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "status": 400,
-                "error": format!("Invalid token: {:?}", err)
-            }));
-        }
-    };
+) -> Result<HttpResponse, actix_web::Error> {
+    let (_account_id, pool) = init_account_connection(req, account_pools)
+    .await
+    .map_err(|err| {
+      ErrorBadRequest(format!("Invalid token: {:?}", err))
+    })?;
+
 
     let Payload {products, store_name} = payload.into_inner();
 
-    let ids: Vec<i32> = products.iter().map(|p| p.id as i32).collect();
+    let ids: Vec<i64> = products.iter().map(|p| p.id as i64).collect();
     let names: Vec<String> = products.iter().map(|p| p.name.clone()).collect();
     let categories: Vec<String> = products.iter().map(|p| p.category.clone()).collect();
     let descriptions: Vec<String> = products.iter().map(|p| p.description.clone()).collect();
@@ -42,8 +41,8 @@ pub async fn add_products_to_store(
     let seo_descriptions: Vec<String> = products.iter().map(|p| p.seo_description.clone()).collect();
     let seo_titles: Vec<String> = products.iter().map(|p| p.seo_title.clone()).collect();
     let statuses: Vec<String> = products.iter().map(|p| p.status.clone()).collect();
-    let tags: Vec<String> = products.iter().map(|p| p.tags.clone()).collect();
-    let product_urls: Vec<String> = products.iter().map(|p| p.product_url.clone()).collect();
+    let tags: Vec<String> = products.iter().map(|p| p.tags.clone().unwrap_or_default()).collect();
+    let product_urls: Vec<String> = products.iter().map(|p| p.product_url.clone().unwrap_or_default()).collect();
     let updated_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.updated_at.clone()).collect();
     let vendors: Vec<String> = products.iter().map(|p| p.vendor.clone()).collect();
     let created_ats: Vec<DateTime<Utc>> = products.iter().map(|p| p.created_at.clone()).collect();
@@ -78,7 +77,7 @@ pub async fn add_products_to_store(
         store_name
     );
 
-    let products_added = sqlx::query(&query_str)
+    let _products_added = sqlx::query(&query_str)
       .bind(&ids)
       .bind(&names)
       .bind(&created_ats)
@@ -96,20 +95,14 @@ pub async fn add_products_to_store(
       .bind(&product_urls)
       .bind(&store_ids)
       .execute(&pool)
-      .await;
+      .await
+      .map_err(|err| {
+        ErrorInternalServerError(format!("Error adding products into store: {}", err))
+      })?;
 
-    if let Err(err) = products_added {
-          eprintln!("Error adding products into store: {}", err);
-          return HttpResponse::InternalServerError().json(serde_json::json!({
-            "status": 500,
-            "message": format!("Error adding products into store: {}", err),
-            "response": []
-          }));
-    }
-
-    HttpResponse::Ok().json(serde_json::json!({
+    Ok(HttpResponse::Ok().json(serde_json::json!({
       "status": 200,
       "Message": "Added products to store",
       "response": []
-    }))
+    })))
 }

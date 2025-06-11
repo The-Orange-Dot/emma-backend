@@ -11,8 +11,8 @@ pub async fn init_account_connection(req: HttpRequest, account_pools: Data<Accou
         Ok(id) => id,
         Err(err) => {
             println!("Failed to parse token to string: {:?}", err);
-            return Err(HttpResponse::BadRequest().json(serde_json::json!({
-                "status": 400,
+            return Err(HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": 401,
                 "error": format!("Invalid token: {:?}", err)
             })))
         }
