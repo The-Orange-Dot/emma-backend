@@ -44,4 +44,5 @@ pub struct StoreWithProducts {
     #[serde(flatten)]
     pub store: Store,
     pub products: Vec<Product>,
+    pub total_products: i64
 }

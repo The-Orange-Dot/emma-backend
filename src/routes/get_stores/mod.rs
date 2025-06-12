@@ -33,18 +33,19 @@ pub async fn get_stores(
     for store in all_stores {
         let store_name = store.store_name.clone();
         let products_result = fetch_products_for_store_limited(&store.store_table, &pool, 1).await;
-        println!("DEBUG: {:?}", products_result);
-        let products_for_this_store = match products_result {
+
+        let (products_for_this_store, total_products) = match products_result {
             Ok(p) => p,
             Err(e) => {
                 log::warn!("Could not fetch product for store {}: {}. Returning empty products list.", store_name, e);
-                Vec::new()
+                (Vec::new(), 0)
             }
         };
 
         results.push(StoreWithProducts {
             store, 
             products: products_for_this_store,
+            total_products
         });
     }    
 
@@ -59,8 +60,8 @@ pub async fn get_stores(
 pub async fn fetch_products_for_store_limited(
     store_product_table_name: &str,
     store_db_pool: &Pool<Postgres>,
-    limit: u32, 
-) -> Result<Vec<Product>, Error> {
+    limit: i64, 
+) -> Result<(Vec<Product>, i64), Error> {
     let query = format!("SELECT * FROM {}_products ORDER BY id LIMIT {}", store_product_table_name, limit);
 
     let products = sqlx::query_as::<_, Product>(&query)
@@ -71,5 +72,17 @@ pub async fn fetch_products_for_store_limited(
             actix_web::error::ErrorInternalServerError(format!("Failed to retrieve products for store: {}", e))
         })?;
 
-    Ok(products)
+    let total_products_query = format!("SELECT COUNT(*) FROM {}_products", store_product_table_name);    
+
+    let (total_products,) = sqlx::query_as::<_, (i64,)>(&total_products_query)
+        .fetch_one(store_db_pool)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to fetch total products from table {} with limit {}: {}", store_product_table_name, limit, e);
+            actix_web::error::ErrorInternalServerError(format!("Failed to retrieve total products for store: {}", e))
+        })?;        
+
+
+
+    Ok((products, total_products))
 }
