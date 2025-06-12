@@ -21,12 +21,15 @@ pub async fn target_account_pool(
             actix_web::error::ErrorInternalServerError("Database busy")
         })?;
 
+    println!("DEBUG target_account_pools, pools: {:?}", pools);
     // Find and return the pool if it exists
-    let _pool_found = pools.get(&account_uuid)
+    let pool_found = pools.get(&account_uuid)
         .map(|wrapper| wrapper.pool.clone())
         .ok_or_else(|| {
             println!("Account pool not found");
         });
+
+    println!("DEBUG pools_found: {:?}", pool_found);
 
     let admin_conn: Pool<Postgres> = target_admin_pool(admin_pool);
 

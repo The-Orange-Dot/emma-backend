@@ -24,7 +24,6 @@ pub async fn me(
     req: HttpRequest,
     admin_pool: web::Data<AdminPool>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    println!("DEBUG req: {:?}", req);
 
     let user_uuid = token_to_uuid(req)?;
 
@@ -43,9 +42,6 @@ pub async fn me(
                 _ => ErrorInternalServerError("Failed to retrieve user data."),
             }
         })?;
-
-    println!("DEBUG account: {:?}", account);
-
 
     Ok(HttpResponse::Ok().json(json!({
         "status": 200,
