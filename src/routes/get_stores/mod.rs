@@ -1,6 +1,6 @@
 
 use actix_web::{get, web, HttpRequest, HttpResponse, Error};
-use crate::models::{pools_models::{AccountPools, AdminPool}, products_models::Product, store_models::{Store, StoreWithProducts}};
+use crate::{helpers::target_pool::target_admin_pool, models::{pools_models::{AccountPools, AdminPool}, products_models::Product, store_models::{Store, StoreWithProducts}}};
 use serde_json;
 use crate::helpers::init_account_connection::init_account_connection;
 use sqlx::{Pool, Postgres};
@@ -19,8 +19,10 @@ pub async fn get_stores(
         }
     };
 
+    let admin_conn = target_admin_pool(admin_pool);
+
     let all_stores = sqlx::query_as::<_, Store>("SELECT * FROM stores")
-        .fetch_all(&admin_pool.0) // Use the admin pool here
+        .fetch_all(&admin_conn)
         .await
         .map_err(|err| {
             log::error!("Error fetching all stores: {}", err);
@@ -50,7 +52,7 @@ pub async fn get_stores(
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": 200,
         "message": "Successfully fetched stores with one product each",
-        "response": results // Return the vector of StoreWithProducts
+        "response": results
     })))
 
 }
@@ -58,7 +60,7 @@ pub async fn get_stores(
 pub async fn fetch_products_for_store_limited(
     store_product_table_name: &str,
     store_db_pool: &Pool<Postgres>,
-    limit: u32, // Add a limit parameter
+    limit: u32, 
 ) -> Result<Vec<Product>, Error> {
     let query = format!("SELECT * FROM {} ORDER BY id LIMIT {}", store_product_table_name, limit);
 
