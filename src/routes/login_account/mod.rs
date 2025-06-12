@@ -29,6 +29,8 @@ pub async fn login_account(
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
 
+    println!("TEST 1");
+
     let found_account = match sqlx::query_as::<_, Account>(
         "SELECT * FROM accounts WHERE LOWER(email) = LOWER($1)"
     )
@@ -48,6 +50,7 @@ pub async fn login_account(
            Err(ErrorInternalServerError("Database error during login."))
         }
     }?;
+    println!("TEST 2");
 
     let stored_hash = match PasswordHash::new(&found_account.password)
         {
@@ -59,6 +62,8 @@ pub async fn login_account(
         }?;
 
     let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
+
+        println!("TEST 3");
 
     match password_verification {
         Ok(_) => {
@@ -76,6 +81,7 @@ pub async fn login_account(
               "updated_at": found_account.updated_at,
               "username": found_account.username
             });
+    println!("TEST 4");
 
             let (access_token, refresh_token) = auth::generate_new_tokens(&found_account.id)
                 .map_err(|err| {
