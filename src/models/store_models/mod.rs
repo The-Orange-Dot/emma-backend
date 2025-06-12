@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use sqlx::FromRow;
+use crate::models::products_models::Product;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoreCredentials {
@@ -35,5 +36,12 @@ pub struct Store {
   pub sys_prompt: String,
   pub shopify_storefront_store_name: Option<String>,
   pub shopify_storefront_access_token: Option<String>
-  
+}
+
+
+#[derive(Serialize, Debug)]
+pub struct StoreWithProducts {
+    #[serde(flatten)]
+    pub store: Store,
+    pub products: Vec<Product>,
 }

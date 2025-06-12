@@ -1,42 +1,74 @@
 
-use actix_web::{get, web, HttpRequest, HttpResponse};
-use crate::models::{pools_models::{AccountPools, AdminPool}, store_models::Store};
+use actix_web::{get, web, HttpRequest, HttpResponse, Error};
+use crate::models::{pools_models::{AccountPools, AdminPool}, products_models::Product, store_models::{Store, StoreWithProducts}};
 use serde_json;
 use crate::helpers::init_account_connection::init_account_connection;
+use sqlx::{Pool, Postgres};
 
 #[get("/stores")]
 pub async fn get_stores(
     req: HttpRequest,
     admin_pool: web::Data<AdminPool>,
     account_pools: web::Data<AccountPools>,
-) -> HttpResponse {
-    let (_account_id, pool) = match init_account_connection(req, admin_pool, account_pools).await {
+) -> Result<HttpResponse, Error> {
+    let (_account_id, pool) = match init_account_connection(req, admin_pool.clone(), account_pools).await {
         Ok(res) => res,
         Err(err) => {
             println!("Failed to initialize account connection: {:?}", err);
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "status": 400,
-                "error": format!("Invalid token: {:?}", err)
-            }));
+            return Err(actix_web::error::ErrorBadRequest(format!("Invalid token: {:?}", err)));
         }
     };
 
-    match sqlx::query_as::<_, Store>("SELECT * FROM stores")
-        .fetch_all(&pool)
+    let all_stores = sqlx::query_as::<_, Store>("SELECT * FROM stores")
+        .fetch_all(&admin_pool.0) // Use the admin pool here
         .await
-    {
-        Ok(stores) => HttpResponse::Ok().json(serde_json::json!({
-            "status": 200,
-            "message": "Successfully fetched stores",
-            "response": stores
-        })),
-        Err(err) => {
-            log::error!("Error fetching stores: {}", err);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": 500,
-                "error": "Failed to fetch stores"
-            }))
-        }
-    }
+        .map_err(|err| {
+            log::error!("Error fetching all stores: {}", err);
+            actix_web::error::ErrorInternalServerError("Failed to fetch stores from admin DB")
+        })?;    
   
+    let mut results: Vec<StoreWithProducts> = Vec::new();
+
+    for store in all_stores {
+        let store_name = store.store_name.clone();
+        let products_result = fetch_products_for_store_limited(&store.store_table, &pool, 1).await;
+
+        let products_for_this_store = match products_result {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("Could not fetch product for store {}: {}. Returning empty products list.", store_name, e);
+                Vec::new()
+            }
+        };
+
+        results.push(StoreWithProducts {
+            store, 
+            products: products_for_this_store,
+        });
+    }    
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": 200,
+        "message": "Successfully fetched stores with one product each",
+        "response": results // Return the vector of StoreWithProducts
+    })))
+
+}
+
+pub async fn fetch_products_for_store_limited(
+    store_product_table_name: &str,
+    store_db_pool: &Pool<Postgres>,
+    limit: u32, // Add a limit parameter
+) -> Result<Vec<Product>, Error> {
+    let query = format!("SELECT * FROM {} ORDER BY id LIMIT {}", store_product_table_name, limit);
+
+    let products = sqlx::query_as::<_, Product>(&query)
+        .fetch_all(store_db_pool)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to fetch products from table {} with limit {}: {}", store_product_table_name, limit, e);
+            actix_web::error::ErrorInternalServerError(format!("Failed to retrieve products for store: {}", e))
+        })?;
+
+    Ok(products)
 }
