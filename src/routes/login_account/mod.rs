@@ -29,8 +29,6 @@ pub async fn login_account(
     let admin_conn = target_admin_pool(admin_pool);
     let input_password = &req.password;
 
-    println!("TEST 1");
-
     let found_account = match sqlx::query_as::<_, Account>(
         "SELECT * FROM accounts WHERE LOWER(email) = LOWER($1)"
     )
@@ -50,7 +48,6 @@ pub async fn login_account(
            Err(ErrorInternalServerError("Database error during login."))
         }
     }?;
-    println!("TEST 2");
 
     let stored_hash = match PasswordHash::new(&found_account.password)
         {
@@ -62,8 +59,6 @@ pub async fn login_account(
         }?;
 
     let password_verification = Argon2::default().verify_password(input_password.as_bytes(), &stored_hash);
-
-        println!("TEST 3");
 
     match password_verification {
         Ok(_) => {
@@ -81,7 +76,6 @@ pub async fn login_account(
               "updated_at": found_account.updated_at,
               "username": found_account.username
             });
-    println!("TEST 4");
 
             let (access_token, refresh_token) = auth::generate_new_tokens(&found_account.id)
                 .map_err(|err| {
@@ -89,27 +83,29 @@ pub async fn login_account(
                     ErrorInternalServerError("Failed to create user session")
                 })?;
 
-                println!("ACCESS: {:?}", access_token);
-                println!("REFRESH: {:?}", refresh_token);
+            dotenv::dotenv().ok();
+            let is_development = std::env::var("APP_ENV")
+                .map(|s| s == "development")
+                .unwrap_or(false);
 
             Ok(HttpResponse::Ok()
                 .cookie(
                     Cookie::build("access_token", &access_token)
                         .http_only(true)
-                        .secure(true)
-                        .same_site(SameSite::None)
+                        .secure(if is_development { false } else { true })
+                        .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                         .path("/")
-                        .domain("meetemma.ai") 
+                        .domain(if is_development {"localhost"} else {"meetemma.ai"}) 
                         .max_age(Duration::minutes(60))
                         .finish()
                 )
                 .cookie(
                     Cookie::build("refresh_token", &refresh_token)
                         .http_only(true)
-                        .secure(true)                       
-                        .same_site(SameSite::None)
+                        .secure(if is_development { false } else { true })                       
+                        .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                         .path("/")
-                        .domain("meetemma.ai")
+                        .domain(if is_development {"localhost"} else {"meetemma.ai"}) 
                         .max_age(Duration::days(30))
                         .finish()
                 )

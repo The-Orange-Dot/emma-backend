@@ -33,7 +33,7 @@ pub async fn get_stores(
     for store in all_stores {
         let store_name = store.store_name.clone();
         let products_result = fetch_products_for_store_limited(&store.store_table, &pool, 1).await;
-
+        println!("DEBUG: {:?}", products_result);
         let products_for_this_store = match products_result {
             Ok(p) => p,
             Err(e) => {
@@ -61,7 +61,7 @@ pub async fn fetch_products_for_store_limited(
     store_db_pool: &Pool<Postgres>,
     limit: u32, 
 ) -> Result<Vec<Product>, Error> {
-    let query = format!("SELECT * FROM {} ORDER BY id LIMIT {}", store_product_table_name, limit);
+    let query = format!("SELECT * FROM {}_products ORDER BY id LIMIT {}", store_product_table_name, limit);
 
     let products = sqlx::query_as::<_, Product>(&query)
         .fetch_all(store_db_pool)

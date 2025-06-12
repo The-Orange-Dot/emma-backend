@@ -19,6 +19,11 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
 
     let old_refresh_token_value = refresh_token_cookie.value();
 
+    dotenv::dotenv().ok();
+    let is_development = std::env::var("APP_ENV")
+        .map(|s| s == "development")
+        .unwrap_or(false);
+
     let user_uuid = match verify_refresh_token(old_refresh_token_value) {
         Ok(uuid) => uuid,
         Err(e) => {
@@ -27,18 +32,18 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
                 .cookie(Cookie::build("access_token", "")
                     .max_age(Duration::new(0,0))
                     .path("/refresh")
-                    .secure(true)
-                    .domain("meetemma.ai")                 
+                    .secure(if is_development { false } else { true })
+                    .domain(if is_development {"localhost"} else {"meetemma.ai"})                  
                     .http_only(true)
-                    .same_site(SameSite::None)
+                    .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                     .finish())
                 .cookie(Cookie::build("refresh_token", "")
                     .max_age(Duration::new(0,0))
                     .path("/refresh")
-                    .secure(true)
-                    .domain("meetemma.ai") 
+                    .secure(if is_development { false } else { true })
+                    .domain(if is_development {"localhost"} else {"meetemma.ai"})  
                     .http_only(true)
-                    .same_site(SameSite::None)
+                    .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                     .finish())
                 .json(json!({
                     "status": 401,
@@ -69,7 +74,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             Cookie::build("access_token", &new_access_token)
                 .http_only(true)
                 .secure(true)
-                .same_site(SameSite::None)
+                .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                 .path("/refresh")
                 .domain("meetemma.ai") 
                 .max_age(Duration::minutes(60))
@@ -79,7 +84,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             Cookie::build("refresh_token", &new_refresh_token)
                 .http_only(true)
                 .secure(true)
-                .same_site(SameSite::None)
+                .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                 .path("/refresh")
                 .domain("meetemma.ai") 
                 .max_age(Duration::days(30))
