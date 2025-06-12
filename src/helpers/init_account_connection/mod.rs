@@ -21,10 +21,6 @@ pub async fn init_account_connection(
             })))
         }
     };    
-    println!("DEBUG id: {:?}", account_id.clone());
-    println!("DEBUG admin_pool: {:?}", admin_pool);
-    println!("DEBUG account_pools: {:?}", account_pools);
-
 
     let pool = match target_account_pool(account_id.clone(), admin_pool, account_pools).await {
         Ok(pool) => pool,

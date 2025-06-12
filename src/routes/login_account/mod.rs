@@ -99,7 +99,7 @@ pub async fn login_account(
                         .http_only(true)
                         .secure(true)                       
                         .same_site(SameSite::None)
-                        .path("/")
+                        .path("/refresh")
                         .domain("meetemma.ai")
                         .max_age(Duration::days(30))
                         .finish()

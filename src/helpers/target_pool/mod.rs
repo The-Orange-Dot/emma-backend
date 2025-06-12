@@ -21,11 +21,8 @@ pub async fn target_account_pool(
         })?;
 
     if let Some(wrapper) = pools_guard.get(&account_uuid) {
-        println!("DEBUG: Found existing account pool in cache.");
         return Ok(wrapper.pool.clone());
     }
-
-    println!("DEBUG: Account pool not found in cache. Attempting to create new one.");
 
     let admin_conn: Pool<Postgres> = target_admin_pool(admin_pool);
 
