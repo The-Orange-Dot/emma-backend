@@ -138,8 +138,9 @@ async fn main() -> std::io::Result<()> {
                 Cors::default()
                     .allowed_origin("https://meetemma.ai")
                     .allowed_origin("https://localhost:3000") 
+                    .allowed_origin("http://localhost:3000") 
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
-                    .allow_any_header()
+                    .allowed_headers(vec!["Content-Type", "Authorization", "Accept"]) // Headers your frontend sends
                     .supports_credentials() 
                     .max_age(3600)
             )
@@ -166,7 +167,8 @@ async fn main() -> std::io::Result<()> {
             .service(routes::health_check::health_check) // GET
     })
     // .bind_rustls_0_23(("0.0.0.0", 8080), tls_config)?
-    .bind(("0.0.0.0", 8080))?
+    // .bind(("0.0.0.0", 8080))?
+    .bind(("[::]", 8080))?
     .run()
     .await
 }
