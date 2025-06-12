@@ -60,7 +60,7 @@ async fn main() -> std::io::Result<()> {
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
         .max_connections(10)
-        .idle_timeout(Duration::from_secs(300))
+        .idle_timeout(Duration::from_secs(180))
         .acquire_timeout(Duration::from_secs(10))
         .connect(&format!("{}/postgres", &admin_url))
         .await
@@ -69,22 +69,22 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to connect to admin database: {}", err)
         ))?;
 
-    let cleanup_interval = Duration::from_secs(
-        std::env::var("POOL_CLEANUP_INTERVAL_SECS")
-            .unwrap_or("300".to_string())
-            .parse()
-            .unwrap_or(300)
-    );
+    // let cleanup_interval = Duration::from_secs(
+    //     std::env::var("POOL_CLEANUP_INTERVAL_SECS")
+    //         .unwrap_or("300".to_string())
+    //         .parse()
+    //         .unwrap_or(300)
+    // );
 
-    let idle_timeout = Duration::from_secs(
-        std::env::var("POOL_IDLE_TIMEOUT_SECS")
-            .unwrap_or("1800".to_string())
-            .parse()
-            .unwrap_or(1800)
-    );
+    // let idle_timeout = Duration::from_secs(
+    //     std::env::var("POOL_IDLE_TIMEOUT_SECS")
+    //         .unwrap_or("1800".to_string())
+    //         .parse()
+    //         .unwrap_or(1800)
+    // );
 
     let account_pools = AccountPools::new();
-    start_pool_cleanup_task(account_pools.clone(), cleanup_interval, idle_timeout).await;
+    // start_pool_cleanup_task(account_pools.clone(), cleanup_interval, idle_timeout).await;
 
     create_accounts_table(admin_pool.clone()).await
         .map_err(|e| std::io::Error::new(
@@ -139,6 +139,8 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("https://meetemma.ai")
                     .allowed_origin("https://localhost:3000") 
                     .allowed_origin("http://localhost:3000") 
+                    .allowed_origin("http://100.74.191.99:3000") 
+                    .allowed_origin("100.74.191.99") 
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
                     .allowed_headers(vec!["Content-Type", "Authorization", "Accept"]) // Headers your frontend sends
                     .supports_credentials() 
