@@ -83,13 +83,16 @@ pub async fn login_account(
                     ErrorInternalServerError("Failed to create user session")
                 })?;
 
+                println!("ACCESS: {:?}", access_token);
+                println!("REFRESH: {:?}", refresh_token);
+
             Ok(HttpResponse::Ok()
                 .cookie(
                     Cookie::build("access_token", &access_token)
                         .http_only(true)
                         .secure(true)
                         .same_site(SameSite::None)
-                        .path("/login")
+                        .path("/")
                         .domain("meetemma.ai") 
                         .max_age(Duration::minutes(60))
                         .finish()
@@ -99,7 +102,7 @@ pub async fn login_account(
                         .http_only(true)
                         .secure(true)                       
                         .same_site(SameSite::None)
-                        .path("/login")
+                        .path("/")
                         .domain("meetemma.ai")
                         .max_age(Duration::days(30))
                         .finish()
