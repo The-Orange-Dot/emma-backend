@@ -15,8 +15,6 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         }
     };
 
-    println!("DEBUG 1: {:?}", refresh_token_cookie);
-
     let old_refresh_token_value = refresh_token_cookie.value();
 
     let user_uuid = match verify_refresh_token(old_refresh_token_value) {
@@ -47,8 +45,6 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         }
     };
 
-    println!("DEBUG 2: {:?}", user_uuid);
-
     let (new_access_token, new_refresh_token) = match generate_new_tokens(&user_uuid) {
         Ok(tokens) => tokens,
         Err(e) => {
@@ -59,10 +55,6 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             }));
         }
     };
-
-    println!("DEBUG 3: {:?}", new_access_token);
-    println!("DEBUG 4: {:?}", new_refresh_token);
-
 
     HttpResponse::Ok()
         .cookie(
@@ -81,7 +73,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
                 .secure(true)
                 .same_site(SameSite::None)
                 .path("/refresh")
-                .domain("meetemma.ai") 
+                    .domain("meetemma.ai") 
                 .max_age(Duration::days(30))
                 .finish()
         )
