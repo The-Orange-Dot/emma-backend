@@ -1,7 +1,7 @@
 use actix_web::{post, web, HttpResponse};
 use serde_json;
 use crate::models::generation_models::{DemoPayload};
-use crate::models::pools_models::AccountPools;
+use crate::models::pools_models::{AccountPools, AdminPool};
 mod add_products_suggestion;
 use add_products_suggestion::add_products_suggestion;
 mod parse_response;
@@ -11,6 +11,7 @@ use crate::helpers::target_pool::target_account_pool;
 #[post("/generate/demo")]
 pub async fn generation_demo (
   payload: web::Json<DemoPayload>,   
+  admin_pool: web::Data<AdminPool>,
   account_pools: web::Data<AccountPools>,
 ) -> HttpResponse  {
 
@@ -23,7 +24,7 @@ pub async fn generation_demo (
 
   let account_id: String = std::env::var("DEMO_ACCOUNT_ID").expect("No id");
 
-  let pool = match target_account_pool(account_id.clone(), account_pools).await {
+  let pool = match target_account_pool(account_id.clone(), admin_pool, account_pools).await {
       Ok(pool) => pool,
       Err(err) => {
           println!("Failed to connect to user pool: {:?}", err);

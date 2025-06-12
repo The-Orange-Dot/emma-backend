@@ -2,7 +2,7 @@ use actix_web::{get, web::{self, Query}, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx;
 use crate::{
-  models::{pools_models::AccountPools, store_models::Store}};
+  models::{pools_models::{AccountPools, AdminPool}, store_models::Store}};
 use crate::models::products_models::Product;
 use crate::helpers::init_account_connection::init_account_connection;
 
@@ -16,9 +16,10 @@ struct RequestQuery {
 #[get("/store/products")]
 pub async fn get_store_products(
   account_pools: web::Data<AccountPools>,
+  admin_pool: web::Data<AdminPool>,
   req: HttpRequest
 ) -> HttpResponse {
-    let (_account_id, pool) = match init_account_connection(req.clone(), account_pools).await {
+    let (_account_id, pool) = match init_account_connection(req.clone(), admin_pool, account_pools).await {
         Ok(res) => res,
         Err(err) => {
             return HttpResponse::BadRequest().json(serde_json::json!({

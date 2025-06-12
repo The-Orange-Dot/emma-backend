@@ -2,7 +2,7 @@ use actix_web::{put, web, HttpRequest, HttpResponse,
   error::{ErrorInternalServerError, ErrorBadRequest, ErrorNotFound}
 };
 use serde::{Deserialize, Serialize};
-use crate::{helpers::{modify_types::string_to_uuid}, models::pools_models::AccountPools};
+use crate::{helpers::{modify_types::string_to_uuid}, models::pools_models::{AdminPool, AccountPools}};
 use crate::helpers::init_account_connection::init_account_connection;
 
 #[derive(Serialize, Deserialize)]
@@ -14,11 +14,12 @@ struct ReqPayload {
 pub async fn update_store_sys_prompt(
     account_pools: web::Data<AccountPools>,
     payload: web::Json<ReqPayload>,
+    admin_pool: web::Data<AdminPool>,
     req: HttpRequest,
     path: web::Path<String>
 ) ->  Result<HttpResponse, actix_web::Error> {
 
-  let (_account_id, pool) = init_account_connection(req, account_pools)
+  let (_account_id, pool) = init_account_connection(req, admin_pool, account_pools)
     .await
     .map_err(|err| {
         ErrorBadRequest(format!("Failed to init account connection: {:?}", err))

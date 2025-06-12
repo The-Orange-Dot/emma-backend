@@ -4,7 +4,7 @@ use actix_web::{post, web,  HttpRequest, HttpResponse,
     error::{ErrorInternalServerError, ErrorBadRequest}
 };
 use crate::models::products_models::Product;
-use crate::models::pools_models::{AccountPools};
+use crate::models::pools_models::{AccountPools, AdminPool};
 use serde::{Deserialize, Serialize};
 use chrono::{Utc, DateTime};
 use uuid::Uuid;
@@ -19,10 +19,11 @@ store_name: String
 #[post("/stores/products")]
 pub async fn add_products_to_store(
     account_pools: web::Data<AccountPools>,
+    admin_pool: web::Data<AdminPool>,
     payload: web::Json<Payload>,
     req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let (_account_id, pool) = init_account_connection(req, account_pools)
+    let (_account_id, pool) = init_account_connection(req, admin_pool, account_pools)
     .await
     .map_err(|err| {
       ErrorBadRequest(format!("Invalid token: {:?}", err))

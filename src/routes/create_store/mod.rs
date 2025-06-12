@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use upload_csv_to_database::upload_csv_to_database;
 use upload_shopify_to_database::upload_shopify_to_database;
 use crate::helpers::to_snake_case::to_snake_case;
-use crate::models::pools_models::{AccountPools};
+use crate::models::pools_models::{AccountPools, AdminPool};
 use crate::helpers::modify_types::string_to_uuid;
 use uuid::Uuid;
 mod upload_csv_to_database;
@@ -27,9 +27,10 @@ csv: Vec<CSV>
 pub async fn create_store(
     account_pools: web::Data<AccountPools>,
     payload: web::Json<Payload> ,
+    admin_pool: web::Data<AdminPool>,
     req: HttpRequest
   ) -> Result<HttpResponse, actix_web::Error> {
-    let (account_id, pool) = init_account_connection(req, account_pools)
+    let (account_id, pool) = init_account_connection(req, admin_pool, account_pools)
     .await
     .map_err(|err| {
         ErrorBadRequest(format!("Failed to init account connection: {:?}", err))

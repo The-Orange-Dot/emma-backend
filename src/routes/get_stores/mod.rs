@@ -1,15 +1,16 @@
 
 use actix_web::{get, web, HttpRequest, HttpResponse};
-use crate::models::{pools_models::AccountPools, store_models::Store};
+use crate::models::{pools_models::{AccountPools, AdminPool}, store_models::Store};
 use serde_json;
 use crate::helpers::init_account_connection::init_account_connection;
 
 #[get("/stores")]
 pub async fn get_stores(
     req: HttpRequest,
+    admin_pool: web::Data<AdminPool>,
     account_pools: web::Data<AccountPools>,
 ) -> HttpResponse {
-    let (_account_id, pool) = match init_account_connection(req, account_pools).await {
+    let (_account_id, pool) = match init_account_connection(req, admin_pool, account_pools).await {
         Ok(res) => res,
         Err(err) => {
             println!("Failed to initialize account connection: {:?}", err);

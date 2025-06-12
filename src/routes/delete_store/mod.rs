@@ -1,6 +1,6 @@
 use sqlx;
 use actix_web::{delete, error::{ErrorInternalServerError, ErrorNotFound}, web, HttpRequest, HttpResponse};
-use crate::models::{pools_models::AccountPools, store_models::Store};
+use crate::models::{pools_models::{AccountPools, AdminPool}, store_models::Store};
 use serde::{Serialize, Deserialize};
 use serde_json;
 use crate::helpers::init_account_connection::init_account_connection;
@@ -15,10 +15,11 @@ struct DeleteStorePayload {
 #[delete("/store/{store_id}")]
 pub async fn delete_store(
   account_pools: web::Data<AccountPools>,
+  admin_pool: web::Data<AdminPool>,
   req: HttpRequest,
   path: web::Path<String>
 ) -> Result<HttpResponse, actix_web::Error> {
-  let (_account_id, pool) = init_account_connection(req, account_pools).await 
+  let (_account_id, pool) = init_account_connection(req, admin_pool, account_pools).await 
     .map_err(|err| {
       ErrorBadRequest(format!("Invalid user ID format in token claims: {:?}", err))
     })?;

@@ -2,10 +2,14 @@ use crate::helpers::target_pool::target_account_pool;
 use actix_web::{HttpRequest, HttpResponse,};
 use sqlx::{Pool,Postgres};
 use crate::auth::token_to_user_id::{token_to_string_id};
-use crate::models::pools_models::{AccountPools};
+use crate::models::pools_models::{AccountPools, AdminPool};
 use actix_web::web::Data;
 
-pub async fn init_account_connection(req: HttpRequest, account_pools: Data<AccountPools>) -> Result<(String, Pool<Postgres>), HttpResponse> {
+pub async fn init_account_connection(
+    req: HttpRequest,
+    admin_pool: Data<AdminPool>,
+    account_pools: Data<AccountPools>
+) -> Result<(String, Pool<Postgres>), HttpResponse> {
     
     let account_id = match token_to_string_id(req) {
         Ok(id) => id,
@@ -18,7 +22,7 @@ pub async fn init_account_connection(req: HttpRequest, account_pools: Data<Accou
         }
     };
 
-    let pool = match target_account_pool(account_id.clone(), account_pools).await {
+    let pool = match target_account_pool(account_id.clone(), admin_pool, account_pools).await {
         Ok(pool) => pool,
         Err(err) => {
             println!("Failed to connect to user pool: {:?}", err);
