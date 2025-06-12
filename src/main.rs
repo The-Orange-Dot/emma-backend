@@ -167,8 +167,7 @@ async fn main() -> std::io::Result<()> {
             .service(routes::health_check::health_check) // GET
     })
     // .bind_rustls_0_23(("0.0.0.0", 8080), tls_config)?
-    // .bind(("0.0.0.0", 8080))?
-    .bind(("[::]", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
