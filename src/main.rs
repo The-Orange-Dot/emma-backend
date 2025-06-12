@@ -95,8 +95,7 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("http://100.74.191.99:3000") 
                     .allowed_origin("https://100.74.191.99:3000") 
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
-                    //.allowed_headers(vec!["Content-Type", "Authorization", "Accept"]) // Headers your frontend sends
-                    .allow_any_header()
+                    .allowed_headers(vec!["Content-Type", "Authorization", "Accept"]) // Headers your frontend sends
                     .supports_credentials() 
                     .max_age(3600)
             )
