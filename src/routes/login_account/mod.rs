@@ -78,8 +78,8 @@ pub async fn login_account(
             });
 
             let (access_token, refresh_token) = auth::generate_new_tokens(&found_account.id)
-                .map_err(|e| {
-                    eprintln!("Failed to generate JWT tokens: {:?}", e);
+                .map_err(|err| {
+                    eprintln!("Failed to generate JWT tokens: {:?}", err);
                     ErrorInternalServerError("Failed to create user session")
                 })?;
 
@@ -89,7 +89,7 @@ pub async fn login_account(
                         .http_only(true)
                         .secure(true)
                         .same_site(SameSite::None)
-                        .path("/")
+                        .path("/login")
                         .domain("meetemma.ai") 
                         .max_age(Duration::minutes(60))
                         .finish()
@@ -99,7 +99,7 @@ pub async fn login_account(
                         .http_only(true)
                         .secure(true)                       
                         .same_site(SameSite::None)
-                        .path("/")
+                        .path("/login")
                         .domain("meetemma.ai")
                         .max_age(Duration::days(30))
                         .finish()
