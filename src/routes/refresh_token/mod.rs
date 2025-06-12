@@ -26,7 +26,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             return HttpResponse::Unauthorized()
                 .cookie(Cookie::build("access_token", "")
                     .max_age(Duration::new(0,0))
-                    .path("/refresh")
+                    .path("/")
                     .secure(true)
                     .domain("meetemma.ai")                 
                     .http_only(true)
@@ -70,7 +70,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
                 .http_only(true)
                 .secure(true)
                 .same_site(SameSite::None)
-                .path("/refresh")
+                .path("/")
                 .domain("meetemma.ai") 
                 .max_age(Duration::minutes(60))
                 .finish()
@@ -88,5 +88,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         .json(json!({
             "status": 200,
             "message": "Tokens refreshed successfully!",
+            "refresh_token": new_refresh_token,
+            "access_token": new_access_token
         }))
 }
