@@ -36,8 +36,10 @@ impl AccountPools {
             postgres_url
         );
 
+        println!("DEBUG: {:?}", account_db_url);
+
         let pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(10)
             .idle_timeout(Duration::from_secs(300))
             .test_before_acquire(true)
             .connect(&account_db_url)
@@ -55,31 +57,31 @@ impl AccountPools {
         Ok(pool)
     }
 
-    pub fn cleanup_idle_pools(&self, idle_timeout: Duration) {
-        let mut pools = match self.0.write() {
-            Ok(pools) => pools,
-            Err(e) => {
-                log::error!("Failed to acquire write lock for cleanup: {}", e);
-                return;
-            }
-        };
+    // pub fn cleanup_idle_pools(&self, idle_timeout: Duration) {
+    //     let mut pools = match self.0.write() {
+    //         Ok(pools) => pools,
+    //         Err(e) => {
+    //             log::error!("Failed to acquire write lock for cleanup: {}", e);
+    //             return;
+    //         }
+    //     };
 
-        let now = Instant::now();
-        let before_count = pools.len();
+    //     let now = Instant::now();
+    //     let before_count = pools.len();
         
-        pools.retain(|id, wrapper| {
-            let idle_for = now.duration_since(wrapper.last_used);
-            if idle_for >= idle_timeout {
-                log::info!("Cleaning up idle pool for account {} (idle for {:?})", id, idle_for);
-                false
-            } else {
-                true
-            }
-        });
+    //     pools.retain(|id, wrapper| {
+    //         let idle_for = now.duration_since(wrapper.last_used);
+    //         if idle_for >= idle_timeout {
+    //             log::info!("Cleaning up idle pool for account {} (idle for {:?})", id, idle_for);
+    //             false
+    //         } else {
+    //             true
+    //         }
+    //     });
 
-        let after_count = pools.len();
-        if before_count != after_count {
-            log::info!("Pool cleanup completed: {} -> {} pools", before_count, after_count);
-        }
-    }
+    //     let after_count = pools.len();
+    //     if before_count != after_count {
+    //         log::info!("Pool cleanup completed: {} -> {} pools", before_count, after_count);
+    //     }
+    // }
 }

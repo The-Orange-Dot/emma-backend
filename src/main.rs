@@ -10,45 +10,11 @@ mod helpers;
 use models::pools_models::{AdminPool, AccountPools};
 mod auth;
 use crate::models::account_models::AccountInfo;
-use crate::helpers::start_pool_cleanup_task::start_pool_cleanup_task;
-
-// use std::io::BufReader;
-// use std::fs::File;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
     println!("Starting initialization...");   
-
-    // rustls::crypto::aws_lc_rs::default_provider()
-    //     .install_default()
-    //     .unwrap();
-
-    // let (cert_path, key_path) = if std::env::var("APP_ENV") == Ok("development".to_string()) {
-    //     println!("Working with dev-cert and dev-key");
-    //     ("dev-cert.pem", "dev-key.pem")
-    // } else {
-    //     ("cert.pem", "key.pem")
-    // };
-
-    // let mut certs_file = BufReader::new(File::open(cert_path).unwrap());
-    // let mut key_file = BufReader::new(File::open(key_path).unwrap());
-
-    // // load TLS certs and key
-    // // to create a self-signed temporary cert for testing:
-    // // `openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'`
-    // let tls_certs = rustls_pemfile::certs(&mut certs_file)
-    //     .collect::<Result<Vec<_>, _>>()
-    //     .unwrap();
-    // let tls_key = rustls_pemfile::pkcs8_private_keys(&mut key_file)
-    //     .next()
-    //     .unwrap()
-    //     .unwrap();
-
-    // let tls_config = rustls::ServerConfig::builder()
-    //     .with_no_client_auth()
-    //     .with_single_cert(tls_certs, rustls::pki_types::PrivateKeyDer::Pkcs8(tls_key))
-    //     .unwrap();
 
     std::panic::set_hook(Box::new(|panic_info| {
         eprintln!("CRASH: {}", panic_info);
@@ -69,22 +35,7 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to connect to admin database: {}", err)
         ))?;
 
-    // let cleanup_interval = Duration::from_secs(
-    //     std::env::var("POOL_CLEANUP_INTERVAL_SECS")
-    //         .unwrap_or("300".to_string())
-    //         .parse()
-    //         .unwrap_or(300)
-    // );
-
-    // let idle_timeout = Duration::from_secs(
-    //     std::env::var("POOL_IDLE_TIMEOUT_SECS")
-    //         .unwrap_or("1800".to_string())
-    //         .parse()
-    //         .unwrap_or(1800)
-    // );
-
     let account_pools = AccountPools::new();
-    // start_pool_cleanup_task(account_pools.clone(), cleanup_interval, idle_timeout).await;
 
     create_accounts_table(admin_pool.clone()).await
         .map_err(|e| std::io::Error::new(
@@ -168,7 +119,6 @@ async fn main() -> std::io::Result<()> {
             .service(routes::refresh_token::refresh_token)
             .service(routes::health_check::health_check) // GET
     })
-    // .bind_rustls_0_23(("0.0.0.0", 8080), tls_config)?
     .bind(("0.0.0.0", 8080))?
     .run()
     .await
