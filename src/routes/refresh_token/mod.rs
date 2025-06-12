@@ -24,7 +24,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             return HttpResponse::Unauthorized()
                 .cookie(Cookie::build("access_token", "")
                     .max_age(Duration::new(0,0))
-                    .path("/")
+                    .path("/refresh")
                     .secure(true)
                     .domain("meetemma.ai")                 
                     .http_only(true)
@@ -58,17 +58,17 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
 
     HttpResponse::Ok()
         .cookie(
-            Cookie::build("access_token", &new_access_token) // Use new_access_token
+            Cookie::build("access_token", &new_access_token)
                 .http_only(true)
                 .secure(true)
                 .same_site(SameSite::None)
-                .path("/")
+                .path("/refresh")
                 .domain("localhost")
                 .max_age(Duration::minutes(60))
                 .finish()
         )
         .cookie(
-            Cookie::build("refresh_token", &new_refresh_token) // Use new_refresh_token
+            Cookie::build("refresh_token", &new_refresh_token)
                 .http_only(true)
                 .secure(true)
                 .same_site(SameSite::None)
