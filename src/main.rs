@@ -67,7 +67,6 @@ async fn main() -> std::io::Result<()> {
 
     if let Ok(pools) = account_pools.0.read() {
         for (_account_id, wrapper) in pools.iter() {
-            println!("DEBUG: {:?}", wrapper);
             if let Err(e) = init_pgai(wrapper.pool.clone()).await {
                 eprintln!("Failed to initialize PGAI: {}", e);
             }
