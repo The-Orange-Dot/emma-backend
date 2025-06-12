@@ -35,7 +35,7 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to connect to admin database: {}", err)
         ))?;
 
-    let account_pools = AccountPools::new();
+    let account_pools: AccountPools = AccountPools::new();
 
     create_accounts_table(admin_pool.clone()).await
         .map_err(|e| std::io::Error::new(
@@ -43,6 +43,7 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to create accounts table: {:?}", e)
         ))?;
 
+    // FETCHES ALL ACCOUNTS
     let accounts = sqlx::query_as::<_, AccountInfo>(
         "SELECT id, username, db_password FROM accounts"
     )
@@ -53,18 +54,20 @@ async fn main() -> std::io::Result<()> {
         format!("Failed to fetch accounts: {}", e)
     ))?;
 
+    // OPENS UP CONNECTION POOL FOR ALL THEIR ACCOUNTS
     for account in accounts {
-        if let Err(e) = account_pools.get_pool(
+        if let Err(err) = account_pools.get_pool(
             account.id,
             &account.username,
             &account.db_password
         ).await {
-            eprintln!("Failed to initialize pool for {}: {}", account.username, e);
+            eprintln!("Failed to initialize pool for {}: {}", account.username, err);
         }
     }
 
     if let Ok(pools) = account_pools.0.read() {
         for (_account_id, wrapper) in pools.iter() {
+            println!("DEBUG: {:?}", wrapper);
             if let Err(e) = init_pgai(wrapper.pool.clone()).await {
                 eprintln!("Failed to initialize PGAI: {}", e);
             }

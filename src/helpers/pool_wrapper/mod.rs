@@ -36,7 +36,6 @@ impl AccountPools {
             postgres_url
         );
 
-        println!("DEBUG: {:?}", account_db_url);
 
         let pool = PgPoolOptions::new()
             .max_connections(10)
@@ -45,6 +44,8 @@ impl AccountPools {
             .connect(&account_db_url)
             .await
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+        println!("[SUCCESSFULLY CONNECTED TO {} DATABASE]", username);
 
         let mut pools = self.0.write()
             .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Failed to acquire write lock"))?;

@@ -25,8 +25,6 @@ pub async fn init_pgai (pool: sqlx::Pool<sqlx::Postgres>) -> Result<HttpResponse
         }
     };
 
-    println!("[Successfully connected to database]");
-
     for store in &stores {
         let table_name = &store.store_table;
 
