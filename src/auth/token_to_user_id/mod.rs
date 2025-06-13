@@ -1,5 +1,5 @@
 use uuid::Uuid;
-use crate::helpers::modify_types::string_to_uuid;
+use crate::{helpers::modify_types::string_to_uuid, routes::refresh_token::refresh_token};
 use actix_web::HttpRequest;
 use crate::auth::validate_access_token; 
 use jsonwebtoken::errors::ErrorKind;
@@ -23,6 +23,8 @@ pub fn token_to_string_id(req: HttpRequest) -> Result<String, actix_web::Error> 
             ErrorUnauthorized("Access token missing. Please log in.")
         })?;
 
+    // should check for refresh token here if there is no access token
+    // renews tokens if there are and sends error if there isnt
 
     let token = access_token_cookie.value();
 

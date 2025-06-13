@@ -15,7 +15,6 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         }
     };
 
-    println!("DEBUG 1: {:?}", refresh_token_cookie);
 
     let old_refresh_token_value = refresh_token_cookie.value();
 
@@ -31,7 +30,7 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
             return HttpResponse::Unauthorized()
                 .cookie(Cookie::build("access_token", "")
                     .max_age(Duration::new(0,0))
-                    .path("/refresh")
+                    .path("/")
                     .secure(if is_development { false } else { true })
                     .domain(if is_development {"localhost"} else {"meetemma.ai"})                  
                     .http_only(true)
@@ -52,8 +51,6 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         }
     };
 
-    println!("DEBUG 2: {:?}", user_uuid);
-
     let (new_access_token, new_refresh_token) = match generate_new_tokens(&user_uuid) {
         Ok(tokens) => tokens,
         Err(e) => {
@@ -65,28 +62,24 @@ pub async fn refresh_token(req: HttpRequest) -> HttpResponse {
         }
     };
 
-    println!("DEBUG 3: {:?}", new_access_token);
-    println!("DEBUG 4: {:?}", new_refresh_token);
-
-
     HttpResponse::Ok()
         .cookie(
             Cookie::build("access_token", &new_access_token)
                 .http_only(true)
-                .secure(true)
+                .secure(if is_development { false } else { true })
                 .same_site(if is_development { SameSite::Lax } else { SameSite::None })
-                .path("/refresh")
-                .domain("meetemma.ai") 
+                .path("/")
+                .domain(if is_development {"localhost"} else {"meetemma.ai"})  
                 .max_age(Duration::minutes(60))
                 .finish()
         )
         .cookie(
             Cookie::build("refresh_token", &new_refresh_token)
                 .http_only(true)
-                .secure(true)
+                .secure(if is_development { false } else { true })
                 .same_site(if is_development { SameSite::Lax } else { SameSite::None })
                 .path("/refresh")
-                .domain("meetemma.ai") 
+                .domain(if is_development {"localhost"} else {"meetemma.ai"})  
                 .max_age(Duration::days(30))
                 .finish()
         )
