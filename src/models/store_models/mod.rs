@@ -4,6 +4,7 @@ use uuid::Uuid;
 use sqlx::FromRow;
 use crate::models::products_models::Product;
 use serde_json::Value;
+use std::net::IpAddr;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoreCredentials {
@@ -39,7 +40,6 @@ pub struct Store {
   pub shopify_storefront_access_token: Option<String>
 }
 
-
 #[derive(Serialize, Debug)]
 pub struct StoreWithProducts {
     #[serde(flatten)]
@@ -48,15 +48,15 @@ pub struct StoreWithProducts {
     pub total_products: i64
 }
 
-#[derive(Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow, Debug)]
 pub struct Analytics {
   pub id: Uuid,
   pub event_type: String,
   pub event_timestamp: DateTime<Utc>,
-  pub event_data: Value,
-  pub ip_address: String,
-  pub user_agent: String,
-  pub user_data: Value
+  pub event_data: Option<Value>,
+  pub ip_address: IpAddr,
+  pub user_agent: Option<String>,
+  pub user_data: Option<Value>
 }
 
 #[derive(Serialize, Deserialize)]

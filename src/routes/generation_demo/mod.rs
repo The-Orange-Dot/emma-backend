@@ -8,7 +8,7 @@ use add_products_suggestion::add_products_suggestion;
 mod parse_response;
 use parse_response::parse_response;
 use crate::helpers::target_pool::target_account_pool;
-
+use std::net::IpAddr;
 
 #[post("/generate/demo")]
 pub async fn generation_demo (
@@ -78,16 +78,25 @@ pub async fn generation_demo (
       "suggested_products": parsed_response.extracted_products
     });
 
+    let parsed_ip_v4: IpAddr = payload.user_ip.parse()
+      .map_err(|err| {
+        eprintln!("Could not parse user_ip address: {}", err)
+      }).unwrap();
 
     let analytics_uuid = Uuid::new_v4();
-    let analytics_query = format!("INSERT INTO {}_analytics (id, event_type, ip_address, event_data) VALUES ($1, $2, $3)", &payload.selector);
+    let analytics_query = format!("INSERT INTO {}_analytics (id, event_type, ip_address, user_agent, event_data) VALUES ($1, $2, $3, $4, $5)", &payload.selector);
     let _analytics = sqlx::query(&analytics_query)
     .bind(analytics_uuid)
     .bind("prompt")
-    .bind(payload.user_ip)
+    .bind(parsed_ip_v4)
+    .bind(payload.user_agent)
     .bind(event_data)
     .execute(&pool)
-    .await;
+    .await
+    .map_err(|err| {
+      eprint!("Error inserting analytics: {}", err);
+    })
+    ;
 
   // Insert into store_analytics table
   // id UUID PRIMARY KEY DEFAULT,

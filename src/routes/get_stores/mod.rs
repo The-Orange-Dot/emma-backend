@@ -47,13 +47,25 @@ pub async fn get_stores(
         let store_name = store.store_name.clone();
         let products_result = fetch_products_for_store_limited(&store.store_table, &pool, 1).await;
 
-        let (products_for_this_store, total_products, analytics) = match products_result {
+        let (products_for_this_store, total_products) = match products_result {
             Ok(p) => p,
             Err(e) => {
                 log::warn!("Could not fetch product for store {}: {}. Returning empty products list.", store_name, e);
-                (Vec::new(), 0, Vec::new())
+                (Vec::new(), 0)
             }
         };
+
+
+        let analytics_query = format!("SELECT * FROM {}_analytics", store.store_table);
+
+        let analytics = sqlx::query_as::<_, Analytics>(&analytics_query)
+            .fetch_all(&pool)
+            .await
+            .or_else(|err| {
+                eprint!("Failed to fetch analytics from table {}: {}",  store.store_table, err);
+                Err(Vec::<Analytics>::new())
+            }).unwrap();
+
 
         results.push(StoreWithProductsAndAnalytics {
             store, 
@@ -75,7 +87,7 @@ pub async fn fetch_products_for_store_limited(
     store_product_table_name: &str,
     store_db_pool: &Pool<Postgres>,
     limit: i64, 
-) -> Result<(Vec<Product>, i64, Vec<Analytics>), Error> {
+) -> Result<(Vec<Product>, i64), Error> {
     let query = format!("SELECT * FROM {}_products ORDER BY id LIMIT {}", store_product_table_name, limit);
 
     let products = sqlx::query_as::<_, Product>(&query)
@@ -94,17 +106,7 @@ pub async fn fetch_products_for_store_limited(
         .map_err(|e| {
             log::error!("Failed to fetch total products from table {} with limit {}: {}", store_product_table_name, limit, e);
             actix_web::error::ErrorInternalServerError(format!("Failed to retrieve total products for store: {}", e))
-        })?;        
+        })?;       
 
-    let analytics_query = format!("SELECT * FROM {}_analytics", store_product_table_name);
-    let analytics = sqlx::query_as::<_, Analytics>(&analytics_query)
-        .fetch_all(store_db_pool)
-        .await
-        .map_err(|e| {
-            log::error!("Failed to fetch analytics from table {} with limit {}: {}", store_product_table_name, limit, e);
-            actix_web::error::ErrorInternalServerError(format!("Failed to retrieve products for store: {}", e))
-        })?;
-
-
-    Ok((products, total_products, analytics))
+    Ok((products, total_products))
 }

@@ -21,7 +21,7 @@ pub struct DemoPayload {
     pub images: Vec<ImageData>, 
     pub selector: String,
     pub user_ip: String,
-    pub user_agent: String
+    pub user_agent: Value,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

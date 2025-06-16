@@ -6,15 +6,10 @@ use actix_web::{
     error::{ErrorUnauthorized, ErrorInternalServerError}
 };
 use crate::{
-  auth::{
-    token_to_user_id::token_to_uuid,
-  },
-  helpers::{
-    target_pool::target_admin_pool
-  },
+  auth::token_to_user_id::token_to_uuid,
+  helpers::target_pool::target_admin_pool,
   models::{
-    pools_models::AdminPool,
-    account_models::Account
+    account_models::Account, pools_models::AdminPool
   }
 };
 use serde_json::json;
@@ -42,6 +37,9 @@ pub async fn me(
                 _ => ErrorInternalServerError("Failed to retrieve user data."),
             }
         })?;
+    
+
+
 
     Ok(HttpResponse::Ok().json(json!({
         "status": 200,
