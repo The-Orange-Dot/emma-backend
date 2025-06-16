@@ -8,7 +8,7 @@ use crate::models::generation_models::ParsedResponse;
 pub async fn parse_response(
     response_with_product_suggestions: String, 
     pool: Pool<Postgres>,
-    selector: String
+    selector: String,
 ) -> Result<ParsedResponse, Error>{
 
     // Parses text to extract text and products wrapped in square brackets
@@ -109,6 +109,7 @@ pub async fn parse_response(
         text: cleaned_response,
         products: json_response,
         store_domain: store_data.domain,
+        extracted_products: formatted_products_array
     })
 
 }

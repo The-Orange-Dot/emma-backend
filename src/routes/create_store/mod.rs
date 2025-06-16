@@ -152,7 +152,22 @@ pub async fn create_store(
       ErrorInternalServerError(format!("Failed to initiate database operation: {}", err))
     })?;
 
-    
+  let analytics_table_name = format!("{}_analytics", store_table_name);
+  let create_new_product_table_query = format!("
+  CREATE TABLE IF NOT EXISTS {} (
+          id UUID PRIMARY KEY,
+          event_type VARCHAR(50) NOT NULL, 
+          event_timestamp TIMESTAMPTZ DEFAULT NOW(),        
+          event_data JSONB,
+          ip_address INET,
+          user_agent TEXT,
+          user_data JSONB
+      )
+      ", &analytics_table_name);
+
+  let _new_analytics_table = sqlx::query(&create_new_product_table_query)
+    .execute(&mut *transaction)
+    .await;    
 
 
   let snake_case_store_name = to_snake_case(&store_name);

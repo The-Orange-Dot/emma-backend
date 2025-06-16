@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use sqlx::FromRow;
 use crate::models::products_models::Product;
+use serde_json::Value;
 
 #[derive(Serialize, Deserialize)]
 pub struct StoreCredentials {
@@ -45,4 +46,24 @@ pub struct StoreWithProducts {
     pub store: Store,
     pub products: Vec<Product>,
     pub total_products: i64
+}
+
+#[derive(Serialize, Deserialize, FromRow)]
+pub struct Analytics {
+  pub id: Uuid,
+  pub event_type: String,
+  pub event_timestamp: DateTime<Utc>,
+  pub event_data: Value,
+  pub ip_address: String,
+  pub user_agent: String,
+  pub user_data: Value
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StoreWithProductsAndAnalytics {
+    #[serde(flatten)]
+    pub store: Store,
+    pub products: Vec<Product>,
+    pub total_products: i64,
+    pub analytics: Vec<Analytics>
 }

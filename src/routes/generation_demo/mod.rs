@@ -1,5 +1,6 @@
 use actix_web::{post, web, HttpResponse};
 use serde_json;
+use uuid::Uuid;
 use crate::models::generation_models::{DemoPayload};
 use crate::models::pools_models::{AccountPools, AdminPool};
 mod add_products_suggestion;
@@ -7,6 +8,7 @@ use add_products_suggestion::add_products_suggestion;
 mod parse_response;
 use parse_response::parse_response;
 use crate::helpers::target_pool::target_account_pool;
+
 
 #[post("/generate/demo")]
 pub async fn generation_demo (
@@ -54,8 +56,8 @@ pub async fn generation_demo (
 
   let parsed_response = match parse_response(
     response_with_products, 
-    pool,
-    payload.selector
+    pool.clone(),
+    payload.clone().selector
   )
     .await
     {
@@ -68,6 +70,46 @@ pub async fn generation_demo (
         }));
       }
     };
+
+    let event_data = serde_json::json!({
+      "prompt": payload.prompt,
+      "selector": payload.selector,
+      "response": parsed_response.text,
+      "suggested_products": parsed_response.extracted_products
+    });
+
+
+    let analytics_uuid = Uuid::new_v4();
+    let analytics_query = format!("INSERT INTO {}_analytics (id, event_type, ip_address, event_data) VALUES ($1, $2, $3)", &payload.selector);
+    let _analytics = sqlx::query(&analytics_query)
+    .bind(analytics_uuid)
+    .bind("prompt")
+    .bind(payload.user_ip)
+    .bind(event_data)
+    .execute(&pool)
+    .await;
+
+  // Insert into store_analytics table
+  // id UUID PRIMARY KEY DEFAULT,
+  // event_type VARCHAR(50) NOT NULL, -- e.g., 'page_view', 'product_view', 'add_to_cart', 'purchase', 'checkout_started', 'store_visit'
+  // event_timestamp TIMESTAMPTZ DEFAULT NOW(), -- Crucial for time-based analysis
+  // event_data JSONB, -- Optional: for storing additional, unstructured event-specific data (e.g., { "quantity": 2 }, { "referrer": "google.com" })
+  // ip_address INET, -- Optional: for geographical or bot analysis
+  // user_agent TEXT, -- Optional: browser/device information  
+  // user_data JSONB -- This will use ai to parse user data to categorize based on
+        // age_group -> 20s, 30s-40s, 50s and above
+        // ethnicity -> european decent, asian decent, latin decent, african decent
+        // assumed_gender -> male, female
+        // eye_color -> colors
+        // hair_color -> colors
+
+  // EVENT TYPES
+  // - WHEN A USER SENDS A PROMPT
+  // -- event_data -> {prompt: "", response: "", suggested_products: []}
+  
+  // - WHEN A USER CLICKS ON A PRODUCT (Should have a query tag to mark it)
+  // -- event_data -> {product_clicked: product_name}
+  
 
   HttpResponse::Ok().json(serde_json::json!({
       "status": 200,

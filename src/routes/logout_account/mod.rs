@@ -27,7 +27,7 @@ pub async fn logout_account() -> Result<HttpResponse, actix_web::Error> {
                 .http_only(true)
                 .secure(if is_development { false } else { true })
                 .same_site(if is_development { SameSite::Lax } else { SameSite::None })
-                .path("/refresh") 
+                .path("/") 
                 .domain(if is_development {"localhost"} else {"meetemma.ai"}) 
                 .max_age(Duration::new(0, 0))
                 .finish()

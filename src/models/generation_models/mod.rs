@@ -15,14 +15,16 @@ pub struct Product {
     pub product_url: String
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DemoPayload {
     pub prompt: String,
     pub images: Vec<ImageData>, 
-    pub selector: String
+    pub selector: String,
+    pub user_ip: String,
+    pub user_agent: String
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImageData {
     pub data_url: String,
 }
@@ -39,5 +41,7 @@ pub struct GemmaRequest {
 pub struct ParsedResponse {
   pub text: String,
   pub products: Value,
-  pub store_domain: String
+  pub store_domain: String,
+  pub extracted_products: String
+
 }

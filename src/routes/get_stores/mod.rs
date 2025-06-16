@@ -1,5 +1,18 @@
 use actix_web::{get, web, HttpRequest, HttpResponse, Error};
-use crate::{helpers::target_pool::target_admin_pool, models::{pools_models::{AccountPools, AdminPool}, products_models::Product, store_models::{Store, StoreWithProducts}}};
+use crate::{
+    helpers::target_pool::target_admin_pool, 
+    models::{
+        pools_models::{
+        AccountPools, 
+        AdminPool
+    }, 
+    products_models::Product, 
+    store_models::{
+        Analytics, 
+        Store, 
+        StoreWithProductsAndAnalytics
+    }
+}};
 use serde_json;
 use crate::helpers::init_account_connection::init_account_connection;
 use sqlx::{Pool, Postgres};
@@ -28,24 +41,25 @@ pub async fn get_stores(
             actix_web::error::ErrorInternalServerError("Failed to fetch stores from admin DB")
         })?;    
   
-    let mut results: Vec<StoreWithProducts> = Vec::new();
+    let mut results: Vec<StoreWithProductsAndAnalytics> = Vec::new();
 
     for store in all_stores {
         let store_name = store.store_name.clone();
         let products_result = fetch_products_for_store_limited(&store.store_table, &pool, 1).await;
 
-        let (products_for_this_store, total_products) = match products_result {
+        let (products_for_this_store, total_products, analytics) = match products_result {
             Ok(p) => p,
             Err(e) => {
                 log::warn!("Could not fetch product for store {}: {}. Returning empty products list.", store_name, e);
-                (Vec::new(), 0)
+                (Vec::new(), 0, Vec::new())
             }
         };
 
-        results.push(StoreWithProducts {
+        results.push(StoreWithProductsAndAnalytics {
             store, 
             products: products_for_this_store,
-            total_products
+            total_products,
+            analytics
         });
     }    
 
@@ -61,7 +75,7 @@ pub async fn fetch_products_for_store_limited(
     store_product_table_name: &str,
     store_db_pool: &Pool<Postgres>,
     limit: i64, 
-) -> Result<(Vec<Product>, i64), Error> {
+) -> Result<(Vec<Product>, i64, Vec<Analytics>), Error> {
     let query = format!("SELECT * FROM {}_products ORDER BY id LIMIT {}", store_product_table_name, limit);
 
     let products = sqlx::query_as::<_, Product>(&query)
@@ -82,7 +96,15 @@ pub async fn fetch_products_for_store_limited(
             actix_web::error::ErrorInternalServerError(format!("Failed to retrieve total products for store: {}", e))
         })?;        
 
+    let analytics_query = format!("SELECT * FROM {}_analytics", store_product_table_name);
+    let analytics = sqlx::query_as::<_, Analytics>(&analytics_query)
+        .fetch_all(store_db_pool)
+        .await
+        .map_err(|e| {
+            log::error!("Failed to fetch analytics from table {} with limit {}: {}", store_product_table_name, limit, e);
+            actix_web::error::ErrorInternalServerError(format!("Failed to retrieve products for store: {}", e))
+        })?;
 
 
-    Ok((products, total_products))
+    Ok((products, total_products, analytics))
 }
