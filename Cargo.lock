@@ -1254,6 +1254,7 @@ dependencies = [
  "futures",
  "hex",
  "image",
+ "ipnetwork 0.21.1",
  "jsonwebtoken",
  "log",
  "oauth",
@@ -2139,6 +2140,12 @@ checksum = "bf466541e9d546596ee94f9f69590f89473455f88372423e0008fc1a7daf100e"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "ipnetwork"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf370abdafd54d13e54a620e8c3e1145f28e46cc9d704bc6d94414559df41763"
 
 [[package]]
 name = "iri-string"
@@ -3617,7 +3624,7 @@ dependencies = [
  "hashbrown 0.15.4",
  "hashlink",
  "indexmap",
- "ipnetwork",
+ "ipnetwork 0.20.0",
  "log",
  "memchr",
  "native-tls",
@@ -3740,7 +3747,7 @@ dependencies = [
  "hkdf",
  "hmac",
  "home",
- "ipnetwork",
+ "ipnetwork 0.20.0",
  "itoa",
  "log",
  "md-5",
