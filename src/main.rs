@@ -85,13 +85,13 @@ async fn main() -> std::io::Result<()> {
     let admin_pool_data = web::Data::new(AdminPool(admin_pool.clone()));
     let admin_url_data = web::Data::new(admin_url.clone());
 
-    HttpServer::new(move || {s
+    HttpServer::new(move || {
         App::new()
             .wrap(
                 Cors::default()
                     .allowed_origin("https://meetemma.ai")
                     .allowed_origin("https://localhost:3000") 
-                    .allowed_origin("http://localhost:3000")
+                    .allowed_origin("http://localhost:3000") 
                     .allowed_origin("http://100.74.191.99:3000") 
                     .allowed_origin("https://100.74.191.99:3000") 
                     .allowed_origin("https://logo-ja-dangerous-fallen.trycloudflare.com/")
