@@ -94,7 +94,7 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("http://localhost:3000") 
                     .allowed_origin("http://100.74.191.99:3000") 
                     .allowed_origin("https://100.74.191.99:3000") 
-                    .allowed_origin("https://admin.shopify.com")
+                    // .allowed_origin("https://admin.shopify.com")
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
                     .allowed_headers(vec!["Content-Type", "Cookie", "Accept"]) // Headers your frontend sends
                     // .allow_any_header()
