@@ -51,6 +51,7 @@ pub async fn add_products_suggestion(
                 p.category,
                 p.tags,
                 p.seo_description,
+                p.vendor,
                 e.embedding
             FROM {}_products p
             JOIN {}_embeddings e ON p.id = e.product_id
@@ -63,6 +64,7 @@ pub async fn add_products_suggestion(
                 pe.tags,
                 pe.category,
                 pe.seo_description,
+                pe.vendor,
                 pe.description,
                 pe.embedding <=> ai.ollama_embed('nomic-embed-text', $1) as distance
             FROM product_embeddings pe
@@ -78,14 +80,15 @@ pub async fn add_products_suggestion(
                 category,
                 seo_description,
                 seo_title,
+                vendor,
                 MIN(distance) as min_distance
             FROM relevant_chunks
-            GROUP BY id, name, description, tags, seo_description, seo_title, category
+            GROUP BY id, name, description, tags, seo_description, seo_title, vendor, category
             ORDER BY min_distance
             LIMIT 15
         ),
         context_agg AS (
-            SELECT string_agg(name || ' - ' || seo_title, ', ') AS context_chunk
+            SELECT string_agg(name || ' - ' || vendor || '-' || seo_title, ', ') AS context_chunk
             FROM relevant_products
         )
         SELECT ai.ollama_generate(
