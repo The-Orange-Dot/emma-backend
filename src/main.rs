@@ -1,4 +1,4 @@
-use actix_web::{HttpServer, App, web};
+use actix_web::{HttpServer, App, web, http::header::HeaderValue};
 mod routes;
 mod models;
 use sqlx::postgres::PgPoolOptions;
@@ -85,8 +85,6 @@ async fn main() -> std::io::Result<()> {
     let admin_pool_data = web::Data::new(AdminPool(admin_pool.clone()));
     let admin_url_data = web::Data::new(admin_url.clone());
 
-    let shopify_url = std::env::var("SHOPIFY_APP_URL").unwrap();
-
     HttpServer::new(move || {
         App::new()
             .wrap(
@@ -98,10 +96,24 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("https://100.74.191.99:3000") 
                     .allowed_origin("https://100.71.24.109:3000") 
                     .allowed_origin("https://100.71.24.109:3000") 
-                    .allowed_origin(&shopify_url)
                     .allowed_methods(["POST", "DELETE", "GET", "PUT", "OPTIONS"])
-                    .allowed_headers(vec!["Content-Type", "Cookie", "Accept"]) // Headers your frontend sends
-                    // .allow_any_header()
+                    .allowed_headers(vec!["Content-Type", "Cookie", "Accept"])
+                    .allowed_origin_fn(move |origin: &HeaderValue, _req_head| {
+                        if let Ok(origin_str) = origin.to_str() {
+
+                            if origin_str.ends_with(".myshopify.com") {
+                                return true;
+                            }
+
+                            if origin_str.ends_with(".trycloudflare.com") {
+                                return true;
+                            }
+                            if origin_str.ends_with(".trycloudflare.com/") {
+                                return true;
+                            }
+                        }
+                        false
+                    })
                     .supports_credentials() 
                     .max_age(3600)
             )
