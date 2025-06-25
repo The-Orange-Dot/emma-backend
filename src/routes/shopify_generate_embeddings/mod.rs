@@ -13,7 +13,8 @@ data: Vec<EmbedData>
 #[derive(Serialize, Deserialize, Debug)]
 struct EmbedData {
   product_id: String,
-  prompt: String
+  prompt: String,
+  product_type: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -88,14 +89,11 @@ pub async fn shopify_generate_embeddings(
 
         println!("RESPONSE: {:?}", string_embedding);
 
-        let product_embedding = EmbedResponse { product_id: data.product_id, embedding: string_embedding.to_string() };
+        let product_embedding = EmbedResponse { product_id: data.product_id, product_type: data.product_type, embedding: string_embedding.to_string() };
 
         response_vec.push(product_embedding);
 
     };
-
-
-    println!("DEBUG: {:?}", response_vec);
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
       "status": 200,
