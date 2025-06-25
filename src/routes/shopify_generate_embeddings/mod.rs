@@ -20,7 +20,8 @@ struct EmbedData {
 #[derive(Serialize, Deserialize, Debug)]
 struct EmbedResponse {
   product_id: String,
-  embedding: String
+  embedding: String,
+  product_type: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
