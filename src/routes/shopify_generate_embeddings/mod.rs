@@ -29,6 +29,7 @@ pub async fn shopify_generate_embeddings(
     println!("{:?}", body);
 
     let client = reqwest::Client::new();
+    dotenv::dotenv().ok();
     let url = std::env::var("SERVER_URL").expect("Could not find server url");
     let model = "nomic-embed-text:latest";
     let prompts = body.prompt;
