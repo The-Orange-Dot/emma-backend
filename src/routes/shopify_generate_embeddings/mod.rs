@@ -1,7 +1,5 @@
-use actix_web::{post, web, HttpRequest, HttpResponse};
+use actix_web::{post, web, HttpResponse};
 use serde_json;
-use crate::models::pools_models::AdminPool;
-use crate::helpers::target_pool::target_admin_pool;
 use serde::{Serialize, Deserialize};
 use reqwest;
 
@@ -38,12 +36,10 @@ struct EmbeddingResponse {
 
 #[post("/shopify-generate-embeddings")]
 pub async fn shopify_generate_embeddings(
-  req: HttpRequest,
+  // req: HttpRequest,
   payload: web::Json<EmbedRequestPayload>,
-  admin_pool: web::Data<AdminPool>
 ) -> Result<HttpResponse, actix_web::Error> {
     dotenv::dotenv().ok();
-    let _admin_conn = target_admin_pool(admin_pool);
     let body = payload.into_inner();
 
     let client = reqwest::Client::new();
@@ -81,12 +77,6 @@ pub async fn shopify_generate_embeddings(
 
       let suffuxed_removed = parsed_response.strip_prefix(prefix_to_remove).unwrap();
       let string_embedding = suffuxed_removed.strip_suffix(suffix_to_remove).unwrap();
-
-      // let json_response: EmbeddingResponse = serde_json::from_str(&parsed_response)
-      //   .map_err(|err| {
-      //     println!("Failed to converting response text to json: {}", err);
-      //     actix_web::error::ErrorInternalServerError(format!("Error converting response text to json: {}", err))
-      //   }).unwrap();
 
         println!("RESPONSE: {:?}", string_embedding);
 

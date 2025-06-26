@@ -139,6 +139,7 @@ async fn main() -> std::io::Result<()> {
             .service(routes::refresh_token::refresh_token)
             .service(routes::health_check::health_check) // GET
             .service(routes::shopify_generate_embeddings::shopify_generate_embeddings) // POST
+            .service(routes::generate_text_embedding::generate_text_embedding) // POST
     })
     .bind(("0.0.0.0", 8080))?
     .run()
