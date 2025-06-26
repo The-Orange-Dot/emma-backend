@@ -22,6 +22,7 @@ struct EmbeddingResponse {
 async fn generate_text_embedding (
   payload: web::Json<Payload>
 ) -> Result<HttpResponse, actix_web::Error> {
+  dotenv::dotenv().ok();
   let body = payload.into_inner();
   let client = reqwest::Client::new();
   let url = std::env::var("SERVER_URL").expect("Could not find server url");
