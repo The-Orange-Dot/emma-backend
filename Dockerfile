@@ -38,10 +38,10 @@ RUN useradd -m appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 8080
+EXPOSE 3001
 
 ENV RUST_LOG=info
 ENV HOST=0.0.0.0
-ENV PORT=8080
+ENV PORT=3001
 
 CMD ["/app/emma-backend"]
