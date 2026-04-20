@@ -45,4 +45,4 @@ ENV PYTHONUNBUFFERED=1
 ENV HOST=0.0.0.0
 ENV PORT=4000
 
-CMD ["./emma-backend"]
+CMD ["sh", "-c", "./emma-backend || (echo 'Binary failed to start with code $?' && sleep 1000)"]
