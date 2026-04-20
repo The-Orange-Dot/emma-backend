@@ -21,29 +21,27 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 
 RUN apt-get update && \
-    apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    openssl \
-    ca-certificates && \
+    libssl3 \
+    ca-certificates \
+    curl \
+    libgcc-s1 \
+    libc6 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-EXPOSE 8080
-
 COPY --from=builder /app/target/release/emma-backend /app/emma-backend
-
-# COPY cert.pem /app/cert.pem
-# COPY key.pem /app/key.pem
+RUN chmod +x /app/emma-backend
 
 RUN useradd -m appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
-#   CMD curl -f http://localhost:8080/health || exit 1
+EXPOSE 8080
+
+ENV RUST_LOG=info
+ENV HOST=0.0.0.0
+ENV PORT=8080
 
 CMD ["/app/emma-backend"]
