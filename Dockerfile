@@ -1,4 +1,4 @@
-FROM rust:1.87-bookworm AS builder
+FROM rust:1.87 AS builder
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y pkg-config libssl-dev && \
@@ -25,9 +25,10 @@ RUN apt-get update && \
     libssl3 \
     ca-certificates \
     curl \
+    libc6 \
     libgcc-s1 \
-    libc6 && \
-    rm -rf /var/lib/apt/lists/*
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -39,9 +40,9 @@ RUN useradd -m appuser && \
 USER appuser
 
 EXPOSE 4000
-
 ENV RUST_LOG=info
+ENV PYTHONUNBUFFERED=1 
 ENV HOST=0.0.0.0
 ENV PORT=4000
 
-CMD ["/app/emma-backend"]
+CMD ["./emma-backend"]
