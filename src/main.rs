@@ -21,7 +21,7 @@ async fn main() -> std::io::Result<()> {
     }));
 
     let admin_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+        .unwrap_or_else(|_| "postgres://user:pass@localhost:5432/db".to_string());
 
     let admin_pool = PgPoolOptions::new()
         .test_before_acquire(true)
