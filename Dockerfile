@@ -1,17 +1,19 @@
 # --- Builder Stage ---
 FROM rust:1.87-bookworm AS builder
 
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y pkg-config libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
 WORKDIR /app
+
 COPY Cargo.toml Cargo.lock ./
 
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs && \
-    cargo build --release && rm -rf src
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+
+RUN rm -rf src target/release/emma-backend*
 
 COPY . .
+
 RUN cargo build --release
 
 # --- Runtime Stage ---
@@ -21,7 +23,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libssl3 \
     ca-certificates \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -29,8 +30,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/emma-backend /app/emma-backend
 RUN chmod +x /app/emma-backend
 
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+RUN ls -lh /app/emma-backend
 
 EXPOSE 4000
 CMD ["./emma-backend"]
