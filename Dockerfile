@@ -18,7 +18,7 @@ COPY . .
 RUN cargo build --release
 
 # --- Runtime Stage ---
-FROM debian:bookworm-slim
+FROM debian:bookworm
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
