@@ -18,7 +18,7 @@ pub async fn preload_model(pool: Pool<Postgres>) -> Result<(), Error> {
             match sqlx::query(&query).execute(&pool).await {
                 Ok(_) => {
                     println!("[PING]: '{}' Model Preloaded", model);
-                    tokio::time::sleep(Duration::from_secs(2900)).await;
+                    tokio::time::sleep(Duration::from_secs(2000)).await;
                 }
                 Err(err) => {
                     eprintln!("LLM connection error: {}. Retrying in 10s...", err);
