@@ -20,22 +20,13 @@ async fn main() -> std::io::Result<()> {
         eprintln!("CRASH: {}", panic_info);
     }));
 
+    let admin_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set");
+
     let admin_pool = PgPoolOptions::new()
         .connect(&format!("{}/postgres", &admin_url))
         .await
         .expect("FATAL: Could not connect to database!");
-
-    let admin_pool = PgPoolOptions::new()
-        .test_before_acquire(true)
-        .max_connections(10)
-        .idle_timeout(Duration::from_secs(180))
-        .acquire_timeout(Duration::from_secs(10))
-        .connect(&format!("{}/postgres", &admin_url))
-        .await
-        .map_err(|err| std::io::Error::new(
-            std::io::ErrorKind::ConnectionRefused,
-            format!("Failed to connect to admin database: {}", err)
-        ))?;
 
     let account_pools: AccountPools = AccountPools::new();
 
