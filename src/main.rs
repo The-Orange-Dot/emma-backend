@@ -10,9 +10,14 @@ mod helpers;
 use models::pools_models::{AdminPool, AccountPools};
 mod auth;
 use crate::models::account_models::AccountInfo;
+use std::io::{Write};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    // FORCE LOGS TO SHOW IMMEDIATELY
+    std::io::stdout().write_all(b"BOOTING UP...\n").unwrap();
+    std::io::stdout().flush().unwrap();
+
     dotenv::dotenv().ok();
     println!("Starting initialization...");   
 
