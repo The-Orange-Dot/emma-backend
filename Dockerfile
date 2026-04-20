@@ -5,16 +5,9 @@ RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
 WORKDIR /app
 
-COPY Cargo.toml Cargo.lock ./
-
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-
-RUN rm -rf src target/release/emma-backend*
-
 COPY . .
 
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # --- Runtime Stage ---
 FROM debian:bookworm-slim
@@ -29,8 +22,6 @@ WORKDIR /app
 
 COPY --from=builder /app/target/release/emma-backend /app/emma-backend
 RUN chmod +x /app/emma-backend
-
-RUN ls -lh /app/emma-backend
 
 EXPOSE 4000
 CMD ["./emma-backend"]
