@@ -1,16 +1,23 @@
-# Rust build artifacts
+# --- System Files ---
+.DS_Store
+Thumbs.db
+.env
+*.env
+.dev_encryption_key
+
+# --- Rust Specific ---
 /target/
 target/
 **/*.rs.bk
+Cargo.lock
 
-# Optional but recommended for IDE files
+# --- IDEs ---
 .idea/
 .vscode/
+*.swp
+*.swo
 
-# Environment files
-.env
-*.env
-
-# Docker
+# --- Docker ---
 Dockerfile.local
 docker-compose*.yml
+.dockerignore.env
