@@ -1,5 +1,7 @@
 # emma: E-commerce Merchandise Matching Agent
 
+> **Note:** This is the backend repository. You can find the frontend implementation here: [emma-frontend](https://github.com/The-Orange-Dot/emma-frontend)
+
 ## Overview
 
 **emma** (all lowercase) is an AI agent designed to function as a store clerk for e-commerce platforms. This repository contains the backend service, which provides a conversational interface for organic product discovery. By implementing a **Retrieval-Augmented Generation (RAG)** pipeline, the system bridges the gap between raw e-commerce datasets and Large Language Models (LLMs).
