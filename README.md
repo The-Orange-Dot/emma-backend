@@ -1,4 +1,6 @@
-# emma: E-commerce Merchandise Matching Agent
+# emma:
+
+## E-commerce Merchandise Matching Agent
 
 > **Note:** This is the backend repository. You can find the frontend implementation here: [emma-frontend](https://github.com/The-Orange-Dot/emma-frontend)
 
