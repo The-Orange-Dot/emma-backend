@@ -4,6 +4,7 @@ Thumbs.db
 .env
 *.env
 .dev_encryption_key
+*.pem
 
 # --- Rust Specific ---
 /target/
@@ -20,4 +21,5 @@ Cargo.lock
 # --- Docker ---
 Dockerfile.local
 docker-compose*.yml
-.dockerignore.env
+.dockerignore
+.env
