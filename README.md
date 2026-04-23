@@ -53,7 +53,7 @@ The backend is built on the **Actix** ecosystem with **SQLx** for type-safe data
 
 ### The Move to Rust
 
-This project represents a strategic shift from Node.js to Rust. The primary drivers were the requirements for high-performance request throughput and strict memory safety. While the Rust compiler is notoriously demanding, its rigorous "yell-at-you" feedback loop ensures the backend is resource-safe and free from common race conditions.
+While the Rust compiler is notoriously demanding, its "yell-at-you" feedback loop ensures that the backend is resource-safe and free from common race conditions found in more permissive languages like Node.js. For me, this project represents a shift from a Node.js background to Rust. The primary driver was the need for high-performance request throughput and strict memory safety.
 
 ### Isolated PostgreSQL with PGAI
 
